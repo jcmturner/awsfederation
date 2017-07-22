@@ -5,13 +5,15 @@ import (
 	"fmt"
 	"github.com/jcmturner/awsfederation/arn"
 	"github.com/jcmturner/awsfederation/config"
+	"github.com/jcmturner/awsfederation/sts"
 	"github.com/jcmturner/awsvaultcredsprovider"
 )
 
 type FederationUser struct {
-	ARNString string
-	ARN       arn.ARN
-	Provider  *awsvaultcredsprovider.VaultCredsProvider
+	ARNString   string                                    `json:"Arn"`
+	Credentials sts.Credentials                           `json:"Credentials"`
+	ARN         arn.ARN                                   `json:"-"`
+	Provider    *awsvaultcredsprovider.VaultCredsProvider `json:"-"`
 }
 
 func NewFederationUser(c *config.Config, arnStr string) (FederationUser, error) {
@@ -38,9 +40,11 @@ func (u *FederationUser) SetCredentials(accessKey, secretKey string, TTL int64, 
 	if MFASerialNumber != "" && MFASecret != "" {
 		u.Provider.WithMFA(MFASerialNumber, MFASecret)
 	}
+	u.Credentials.AccessKeyID = accessKey
+	u.Credentials.SecretAccessKey = "REDACTED"
 }
 
-func (u *FederationUser) Store(c *config.Config) error {
+func (u *FederationUser) Store() error {
 	if u.Provider == nil {
 		return errors.New("Provider not defined, cannot store credentials")
 	}
@@ -48,4 +52,16 @@ func (u *FederationUser) Store(c *config.Config) error {
 		return errors.New("User does not have credentials defined to be stored")
 	}
 	return u.Provider.Store()
+}
+
+func (u *FederationUser) Load() error {
+	if u.Provider == nil {
+		return errors.New("Provider not defined, cannot load credentials")
+	}
+	if err := u.Provider.Read(); err != nil {
+		return err
+	}
+	u.Credentials.AccessKeyID = u.Provider.Credential.AccessKeyId
+	u.Credentials.SecretAccessKey = "REDACTED"
+	u.Credentials.Expiration = u.Provider.Credential.Expiration
 }

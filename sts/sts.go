@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/jcmturner/awsfederation/config"
 	"github.com/jcmturner/awsfederation/federationuser"
+	"time"
 )
 
 func Federate(c *config.Config, fedUserArn, role, roleSessionName, policy string, duration int64) (*sts.AssumeRoleOutput, error) {
@@ -31,6 +32,7 @@ func AssumeRole(role, roleSessionName, policy string, duration int64, creds cred
 	sess := session.Must(session.NewSession(config))
 	svc := sts.New(sess)
 	ctx := context.Background()
+	//TODO configure context timeout
 
 	params := &sts.AssumeRoleInput{}.SetRoleArn(role).
 		SetDurationSeconds(duration).
@@ -39,4 +41,19 @@ func AssumeRole(role, roleSessionName, policy string, duration int64, creds cred
 		params.SetPolicy(policy)
 	}
 	return svc.AssumeRoleWithContext(ctx, params)
+}
+
+type AssumedRole struct {
+	AssumedRoleUser struct {
+		AssumedRoleID string `json:"AssumedRoleId"`
+		Arn           string `json:"Arn"`
+	} `json:"AssumedRoleUser"`
+	Credentials Credentials `json:"Credentials"`
+}
+
+type Credentials struct {
+	SecretAccessKey string    `json:"SecretAccessKey"`
+	SessionToken    string    `json:"SessionToken"`
+	Expiration      time.Time `json:"Expiration"`
+	AccessKeyID     string    `json:"AccessKeyId"`
 }

@@ -52,12 +52,12 @@ func Parse(arn string) (ARN, error) {
 		AccountID: parts[4],
 	}
 	if strings.Contains(parts[5], ":") {
-		r := strings.SplitN(arn, ":", 2)
+		r := strings.SplitN(parts[5], ":", 2)
 		a.ResourceType = r[0]
 		a.resourceSep = ":"
 		a.Resource = r[1]
 	} else if strings.Contains(parts[5], "/") {
-		r := strings.SplitN(arn, "/", 2)
+		r := strings.SplitN(parts[5], "/", 2)
 		a.ResourceType = r[0]
 		a.resourceSep = "/"
 		a.Resource = r[1]
@@ -82,7 +82,7 @@ func (a *ARN) String() string {
 }
 
 func Valid(arn string) bool {
-	if strings.Contains(arn, " ") {
+	if strings.Contains(strings.SplitN(arn, "/", 2)[0], " ") {
 		return false
 	}
 	if strings.Count(arn, ":") < 5 {
@@ -102,10 +102,10 @@ func Valid(arn string) bool {
 		return false
 	}
 	// 5th account number (12 digit) or null or *
-	if utf8.RuneCountInString(parts[4]) != 12 && parts[4] != "*" {
+	if parts[4] != "" && utf8.RuneCountInString(parts[4]) != 12 && parts[4] != "*" {
 		return false
 	}
-	if _, err := strconv.Atoi(parts[4]); err != nil {
+	if _, err := strconv.Atoi(parts[4]); parts[4] != "" && parts[4] != "*" && err != nil {
 		return false
 	}
 	return strings.HasPrefix(arn, "arn:")
