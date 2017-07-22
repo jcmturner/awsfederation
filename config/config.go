@@ -42,6 +42,8 @@ type Loggers struct {
 	AuditLogger       *log.Logger
 	ApplicationFile   string `json:"Application"`
 	ApplicationLogger *log.Logger
+	AccessLog         string `json:"Access"`
+	AccessEncoder      *json.Encoder
 }
 
 type FedUserCache map[string]*federationuser.FederationUser
@@ -68,6 +70,7 @@ func Load(cfgPath string) (*Config, error) {
 
 func NewConfig() *Config {
 	dl := log.New(os.Stdout, "AWS Federation Server: ", log.Ldate|log.Ltime|log.Lshortfile)
+	je := json.NewDecoder(os.Stdout)
 	return &Config{
 		Vault: Vault{
 			Config: &vaultclient.Config{
@@ -81,6 +84,7 @@ func NewConfig() *Config {
 			Logging: &Loggers{
 				AuditLogger:       dl,
 				ApplicationLogger: dl,
+				AccessEncoder: je,
 			},
 		},
 		FedUserCache: make(FedUserCache),
@@ -110,7 +114,7 @@ func (c *Config) SetAuditLogger(l *log.Logger) *Config {
 }
 
 func (c *Config) SetAuditLogFile(p string) *Config {
-	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0440)
+	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0640)
 	if err != nil {
 		c.ApplicationLogf("Could not open audit log file: %v\n", err)
 	}
@@ -126,7 +130,7 @@ func (c *Config) SetApplicationLogger(l *log.Logger) *Config {
 }
 
 func (c *Config) SetApplicationLogFile(p string) *Config {
-	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0444)
+	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		c.ApplicationLogf("Could not open application log file: %v\n", err)
 	}
@@ -136,8 +140,25 @@ func (c *Config) SetApplicationLogFile(p string) *Config {
 	return c
 }
 
+
+func (c *Config) SetAccessLogFile(p string) *Config {
+	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0640)
+	if err != nil {
+		c.ApplicationLogf("Could not open access log file: %v\n", err)
+	}
+	c.Server.Logging.AccessLog = p
+	enc := json.NewEncoder(f)
+	c.SetAccessEncoder(enc)
+	return c
+}
+
+func (c *Config) SetAccessEncoder(e *json.Encoder) *Config {
+	c.Server.Logging.AccessEncoder = e
+	return c
+}
+
 func (c *Config) ToString() string {
-	// Format back into JSON but remove userID
+	//TODO Format back into JSON but remove userID
 	return ""
 }
 
