@@ -1,17 +1,18 @@
-package config
+package awsfederation
 
 import (
 	"crypto/x509"
 	"fmt"
+	"github.com/jcmturner/awsfederation/config"
 	"github.com/jcmturner/gotestingtools/testingTLS"
-	"github.com/stretchr/testify/assert"
+	"github.com/jcmturner/vaultmock"
 	"io/ioutil"
 	"os"
 	"testing"
 )
 
 const (
-	TestJSON = `
+	TestConfigJSON = `
 {
 	"Server": {
 		"Socket": "%s",
@@ -45,20 +46,22 @@ const (
 `
 )
 
-func TestLoad(t *testing.T) {
+func TestRun(t *testing.T) {
 	certPath, keyPath, certBytes, _ := testingTLS.GenerateSelfSignedTLSKeyPairFiles(t)
 	//Have to add test cert into a certPool to compare in the assertion as this is all we can get back from the TLSClientConfig of the http.Client and certPool has no public mechanism to extract certs from it
 	cert, _ := x509.ParseCertificate(certBytes)
 	certPool := x509.NewCertPool()
 	certPool.AddCert(cert)
 
+	s, addr, vCertPool, test_app_id, test_user_id := vaultmock.RunMockVault(t)
+	defer s.Close()
+
 	//Create temp userid file
 	f, _ := ioutil.TempFile(os.TempDir(), "userid")
 	defer os.Remove(f.Name())
-	userid := "0ecd7b5d-4885-45c1-a03f-5949e485c6bf"
 	u := fmt.Sprintf(`{
 	"UserId": "%s"
-	}`, userid)
+	}`, test_user_id)
 	f.WriteString(u)
 	f.Close()
 
@@ -75,27 +78,13 @@ func TestLoad(t *testing.T) {
 	ls := "127.0.0.1:9443"
 	ep := "https://127.0.0.1:8200"
 
-	completeJson := fmt.Sprintf(TestJSON, ls, certPath, keyPath, auditLog.Name(), appLog.Name(), accessLog.Name(), "/testsecret/", ep, certPath, "0f9ef666-cdd9-4176-8c69-2d456be86ac0", "09f28d61-67c0-4587-82f6-e2df56a1b075", f.Name())
+	completeJson := fmt.Sprintf(TestConfigJSON, ls, certPath, keyPath, auditLog.Name(), appLog.Name(), accessLog.Name(), "/testsecret/", ep, certPath, "0f9ef666-cdd9-4176-8c69-2d456be86ac0", "09f28d61-67c0-4587-82f6-e2df56a1b075", f.Name())
 
 	testConfigFile, _ := ioutil.TempFile(os.TempDir(), "config")
 	defer os.Remove(testConfigFile.Name())
 	testConfigFile.WriteString(completeJson)
 	testConfigFile.Close()
-	c, err := Load(testConfigFile.Name())
-	if err != nil {
-		t.Fatalf("Error loading configuration JSON: %v", err)
-	}
-	t.Logf("Config: %+v\n", *c)
-	assert.Equal(t, ls, c.Server.Socket, "Server socket not as expected")
-	assert.Equal(t, true, c.Server.TLS.Enabled, "TLS note enabled")
-	assert.Equal(t, certPath, c.Server.TLS.CertificateFile, "Server certificate not as expected")
-	assert.Equal(t, keyPath, c.Server.TLS.KeyFile, "Server key file not as expected")
-	assert.Equal(t, auditLog.Name(), c.Server.Logging.AuditFile, "Audit log filename not as expected")
-	assert.Equal(t, appLog.Name(), c.Server.Logging.ApplicationFile, "Application log filename not as expected")
-	assert.Equal(t, ep, *c.Vault.Config.ReSTClientConfig.EndPoint, "Endpoint on vault HTTP client not as expected")
-	assert.Equal(t, certPath, *c.Vault.Config.ReSTClientConfig.TrustCACert, "Trust CA cert on vault client not as expected")
-	assert.Equal(t, "/testsecret/", c.Vault.Config.SecretsPath, "Secrets path not as expected")
-	assert.Equal(t, f.Name(), c.Vault.Credentials.UserIDFile, "UserID file not as expected")
-	assert.Equal(t, userid, c.Vault.Credentials.UserID, "UserID not as expected")
-	assert.Equal(t, "0f9ef666-cdd9-4176-8c69-2d456be86ac0", c.Vault.Credentials.AppID, "AppID not as expected")
+
+	var a app
+	a.initialize()
 }
