@@ -1,14 +1,14 @@
 package httphandling
 
 import (
-	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/jcmturner/awsfederation/config"
-	"github.com/jcmturner/awsfederation/federationuser"
 	"net/http"
 )
 
-
+const (
+	APIVersion = "v1"
+)
 
 type Route struct {
 	Method      string

@@ -19,12 +19,11 @@ type AccessLog struct {
 	Duration    time.Duration `json:"Duration"`
 }
 
-func AccessLogger(inner http.Handler, c config.Config) http.Handler {
+func AccessLogger(inner http.Handler, c *config.Config) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		ww := NewResponseWriterWrapper(w)
 		inner.ServeHTTP(ww, r)
-		w.Header().Get()
 		l := AccessLog{
 			SourceIP:    r.RemoteAddr,
 			Username:    "placeholder",
@@ -39,7 +38,7 @@ func AccessLogger(inner http.Handler, c config.Config) http.Handler {
 		}
 		err := c.Server.Logging.AccessEncoder.Encode(l)
 		if err != nil {
-			c.Server.Logging.ApplicationLogger.Printf("Could not log access event: %v\n", err)
+			c.ApplicationLogf("Could not log access event: %v\n", err)
 		}
 	})
 }

@@ -9,18 +9,19 @@ import (
 	"github.com/jcmturner/awsfederation/config"
 	"github.com/jcmturner/awsfederation/federationuser"
 	"time"
+	"github.com/jcmturner/awsfederation/awscredential"
 )
 
-func Federate(c *config.Config, fedUserArn, role, roleSessionName, policy string, duration int64) (*sts.AssumeRoleOutput, error) {
+func Federate(c *config.Config, fc *federationuser.FedUserCache, fedUserArn, role, roleSessionName, policy string, duration int64) (*sts.AssumeRoleOutput, error) {
 	var p *credentials.Provider
-	if fu, ok := c.FedUserCache[fedUserArn]; ok {
+	if fu, ok := fc[fedUserArn]; ok {
 		p = fu.Provider
 	} else {
 		fu, err := federationuser.NewFederationUser(c, fedUserArn)
 		if err != nil {
 			return err
 		}
-		c.FedUserCache[fedUserArn] = &fu
+		fc[fedUserArn] = &fu
 		p = fu.Provider
 	}
 	creds := credentials.NewCredentials(p)
@@ -48,12 +49,5 @@ type AssumedRole struct {
 		AssumedRoleID string `json:"AssumedRoleId"`
 		Arn           string `json:"Arn"`
 	} `json:"AssumedRoleUser"`
-	Credentials Credentials `json:"Credentials"`
-}
-
-type Credentials struct {
-	SecretAccessKey string    `json:"SecretAccessKey"`
-	SessionToken    string    `json:"SessionToken"`
-	Expiration      time.Time `json:"Expiration"`
-	AccessKeyID     string    `json:"AccessKeyId"`
+	Credentials awscredential.Credentials `json:"Credentials"`
 }

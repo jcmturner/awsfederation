@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"github.com/jcmturner/awsfederation/federationuser"
 	"github.com/jcmturner/restclient"
 	"github.com/jcmturner/vaultclient"
 	"io/ioutil"
@@ -17,7 +16,6 @@ import (
 type Config struct {
 	Server       Server `json:"Server"`
 	Vault        Vault  `json:"Vault"`
-	FedUserCache *FedUserCache
 }
 
 type Vault struct {
@@ -46,8 +44,6 @@ type Loggers struct {
 	AccessEncoder      *json.Encoder
 }
 
-type FedUserCache map[string]*federationuser.FederationUser
-
 func Load(cfgPath string) (*Config, error) {
 	j, err := ioutil.ReadFile(cfgPath)
 	if err != nil {
@@ -60,6 +56,7 @@ func Load(cfgPath string) (*Config, error) {
 	}
 	c.SetApplicationLogFile(c.Server.Logging.ApplicationFile)
 	c.SetAuditLogFile(c.Server.Logging.AuditFile)
+	c.SetAccessLogFile(c.Server.Logging.AccessLog)
 	err = c.Vault.Credentials.ReadUserID()
 	if err != nil {
 		c.ApplicationLogf(err.Error())
@@ -70,7 +67,7 @@ func Load(cfgPath string) (*Config, error) {
 
 func NewConfig() *Config {
 	dl := log.New(os.Stdout, "AWS Federation Server: ", log.Ldate|log.Ltime|log.Lshortfile)
-	je := json.NewDecoder(os.Stdout)
+	je := json.NewEncoder(os.Stdout)
 	return &Config{
 		Vault: Vault{
 			Config: &vaultclient.Config{
@@ -87,7 +84,6 @@ func NewConfig() *Config {
 				AccessEncoder: je,
 			},
 		},
-		FedUserCache: make(FedUserCache),
 	}
 }
 
@@ -186,6 +182,28 @@ func (c Config) ApplicationLogf(format string, v ...interface{}) {
 		c.Server.Logging.ApplicationLogger = l
 	}
 	c.Server.Logging.ApplicationLogger.Printf(format, v)
+}
+
+func (c Config) Summary() string {
+	return fmt.Sprintf(`AWS Federation Server Configuration:
+	Listenning Socket: %s
+	HTTP Enabled: %v
+	Log Files:
+		Application: %s
+		Audit: %s
+		Access: %s
+	Vault:
+		URL: %s
+		Secrets Path: %s
+`,
+		c.Server.Socket,
+		c.Server.TLS.Enabled,
+		c.Server.Logging.ApplicationFile,
+		c.Server.Logging.AuditFile,
+		c.Server.Logging.AccessLog,
+		*c.Vault.Config.ReSTClientConfig.EndPoint,
+		c.Vault.Config.SecretsPath,
+	)
 }
 
 func isKeyPairVaild(cert, key string) error {

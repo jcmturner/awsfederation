@@ -4,9 +4,11 @@ import (
 	"net/http"
 	"github.com/jcmturner/awsfederation/config"
 	"encoding/json"
+	"github.com/jcmturner/awsfederation/appcode"
+	"fmt"
 )
 
-func WrapCommonHandler(inner http.Handler, c config.Config) http.Handler {
+func WrapCommonHandler(inner http.Handler, c *config.Config) http.Handler {
 
 	//Wrap with access logger
 	inner = AccessLogger(inner, c)
@@ -26,17 +28,17 @@ func setHeaders(w http.ResponseWriter) http.ResponseWriter {
 	return w
 }
 
-type JSONResponseError struct {
-	Error string
+type JSONGenericResponse struct {
+	Message string
 	HTTPCode int
-	ErrorCode int
+	ApplicationCode int
 }
 
-func respondWithError(w http.ResponseWriter, httpCode, errorCode int, message string) {
-	e := JSONResponseError{
-		Error: message,
+func respondGeneric(w http.ResponseWriter, httpCode, appCode int, message string) {
+	e := JSONGenericResponse{
+		Message: message,
 		HTTPCode: httpCode,
-		ErrorCode: errorCode,
+		ApplicationCode: appCode,
 	}
 	respondWithJSON(w, httpCode, e)
 }
@@ -46,4 +48,11 @@ func respondWithJSON(w http.ResponseWriter, httpCode int, payload interface{}) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(httpCode)
 	w.Write(response)
+}
+
+func MethodNotAllowed() http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondGeneric(w, http.StatusMethodNotAllowed, appcode.BAD_DATA, fmt.Sprintf("The %s method cannot be performed against this part of the API", r.Method))
+		return
+	})
 }

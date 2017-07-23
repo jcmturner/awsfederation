@@ -7,23 +7,29 @@ import (
 	"github.com/jcmturner/awsfederation/httphandling"
 	"log"
 	"net/http"
+	"github.com/jcmturner/awsfederation/federationuser"
+	"fmt"
+	"os"
 )
 
 type app struct {
 	Router *mux.Router
 	Config *config.Config
+	FedUserCache *federationuser.FedUserCache
 }
 
 func (a *app) initialize(configPath string) {
-	c, err := config.Load(*configPath)
+	c, err := config.Load(configPath)
 	if err != nil {
 		log.Fatalf("Failed to configure AWS Federation Server: %v\n", err)
 	}
 	a.Config = c
+	c.ApplicationLogf(c.Summary())
 	a.Router = httphandling.NewRouter(a.Config)
 }
 
 func (a *app) run() {
+	fmt.Fprintln(os.Stderr, a.Config.Summary())
 	var err error
 	//Start server
 	if a.Config.Server.TLS.Enabled {
