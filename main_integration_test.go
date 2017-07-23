@@ -1,6 +1,3 @@
-// +build integration
-// To turn on this test use -tags=integration in go test command
-
 package awsfederation
 
 import (
