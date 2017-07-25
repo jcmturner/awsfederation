@@ -1,16 +1,16 @@
 package httphandling
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
+	"github.com/jcmturner/awsfederation/appcode"
+	"github.com/jcmturner/awsfederation/arn"
 	"github.com/jcmturner/awsfederation/config"
 	"github.com/jcmturner/awsfederation/federationuser"
 	"github.com/jcmturner/vaultclient"
-	"net/http"
-	"github.com/jcmturner/awsfederation/appcode"
-	"encoding/json"
 	"io"
-	"github.com/jcmturner/awsfederation/arn"
+	"net/http"
 )
 
 const (
@@ -117,7 +117,7 @@ func updateFederationUserFunc(c *config.Config) http.HandlerFunc {
 			respondGeneric(w, http.StatusBadRequest, appcode.BAD_DATA, "ARN in posted data does not match the API path")
 			return
 		}
-		u.SetCredentials(fu.Credentials.AccessKeyID, fu.Credentials.SecretAccessKey, fu.TTL, fu.MFASerialNumber, fu.MFASecret)
+		u.SetCredentials(fu.Credentials.AccessKeyID, fu.Credentials.SecretAccessKey, fu.Credentials.SessionToken, fu.Credentials.Expiration, fu.TTL, fu.MFASerialNumber, fu.MFASecret)
 		err = u.Store()
 		if err != nil {
 			respondGeneric(w, http.StatusInternalServerError, appcode.FEDERATIONUSER_ERROR, fmt.Sprintf("Error storing federation user in vault: %v", err))
@@ -163,7 +163,7 @@ func createFederationUserFunc(c *config.Config) http.HandlerFunc {
 			respondGeneric(w, http.StatusBadRequest, appcode.FEDERATIONUSER_EXISTS, "Federation user not already exists.")
 			return
 		}
-		u.SetCredentials(fu.Credentials.AccessKeyID, fu.Credentials.SecretAccessKey, fu.TTL, fu.MFASerialNumber, fu.MFASecret)
+		u.SetCredentials(fu.Credentials.AccessKeyID, fu.Credentials.SecretAccessKey, fu.Credentials.SessionToken, fu.Credentials.Expiration, fu.TTL, fu.MFASerialNumber, fu.MFASecret)
 		err = u.Store()
 		if err != nil {
 			respondGeneric(w, http.StatusInternalServerError, appcode.FEDERATIONUSER_ERROR, fmt.Sprintf("Error storing federation user in vault: %v", err))
@@ -179,13 +179,13 @@ func getFederationUserRoutes(c *config.Config) []Route {
 		{
 			Name:        "FederationUserAllList",
 			Method:      "GET",
-			Pattern:     fmt.Sprintf("/"+APIVersion+"/federationuser"),
+			Pattern:     fmt.Sprintf("/" + APIVersion + "/federationuser"),
 			HandlerFunc: listAllFederationUserFunc(c),
 		},
 		{
 			Name:        "FederationUserAccountList",
 			Method:      "GET",
-			Pattern:     fmt.Sprintf("/"+APIVersion+"/federationuser/arn:aws:iam::"+"{"+MuxVarAccountID+":[0-9]{12}}:user"),
+			Pattern:     fmt.Sprintf("/" + APIVersion + "/federationuser/arn:aws:iam::" + "{" + MuxVarAccountID + ":[0-9]{12}}:user"),
 			HandlerFunc: listAccountFederationUserFunc(c),
 		},
 		{
@@ -209,7 +209,7 @@ func getFederationUserRoutes(c *config.Config) []Route {
 		{
 			Name:        "FederationUserCreate",
 			Method:      "POST",
-			Pattern:     fmt.Sprintf("/"+APIVersion+"/federationuser"),
+			Pattern:     fmt.Sprintf("/" + APIVersion + "/federationuser"),
 			HandlerFunc: createFederationUserFunc(c),
 		},
 		{

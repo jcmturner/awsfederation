@@ -7,6 +7,7 @@ import (
 	"github.com/jcmturner/awsfederation/awscredential"
 	"github.com/jcmturner/awsfederation/config"
 	"github.com/jcmturner/awsvaultcredsprovider"
+	"time"
 )
 
 const (
@@ -54,8 +55,8 @@ func ValidateFederationUserARN(arnStr string) (arn.ARN, error) {
 	return a, nil
 }
 
-func (u *FederationUser) SetCredentials(accessKey, secretKey string, TTL int64, MFASerialNumber, MFASecret string) {
-	u.Provider.SetSecretAccessKey(secretKey).SetAccessKey(accessKey).SetTTL(TTL)
+func (u *FederationUser) SetCredentials(accessKey, secretKey string, sessionToken string, exp time.Time, TTL int64, MFASerialNumber, MFASecret string) {
+	u.Provider.SetAccessKey(accessKey).SetSecretAccessKey(secretKey).SetSessionToken(sessionToken).SetExpiration(exp).SetTTL(TTL)
 	if MFASerialNumber != "" && MFASecret != "" {
 		u.Provider.WithMFA(MFASerialNumber, MFASecret)
 	}
@@ -83,6 +84,7 @@ func (u *FederationUser) Load() error {
 	u.Credentials.AccessKeyID = u.Provider.Credential.AccessKeyId
 	u.Credentials.SecretAccessKey = "REDACTED"
 	u.Credentials.Expiration = u.Provider.Credential.Expiration
+	u.Credentials.SessionToken = "REDACTED"
 	if u.Provider.Credential.MFASerialNumber != "" {
 		u.MFASerialNumber = u.Provider.Credential.MFASerialNumber
 		u.MFASecret = "REDACTED"

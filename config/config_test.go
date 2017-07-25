@@ -85,7 +85,6 @@ func TestLoad(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error loading configuration JSON: %v", err)
 	}
-	t.Logf("Config: %+v\n", *c)
 	assert.Equal(t, ls, c.Server.Socket, "Server socket not as expected")
 	assert.Equal(t, true, c.Server.TLS.Enabled, "TLS note enabled")
 	assert.Equal(t, certPath, c.Server.TLS.CertificateFile, "Server certificate not as expected")
