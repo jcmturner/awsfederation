@@ -34,9 +34,9 @@ func listAllFederationUserFunc(c *config.Config) http.HandlerFunc {
 			if m != nil {
 				keys := m["keys"].([]interface{})
 				for _, v := range keys {
-					arn, err := arn.Parse(v.(string))
+					a, err := arn.Parse(v.(string))
 					if err == nil {
-						al = append(al, arn.AccountID)
+						al = append(al, a.AccountID)
 					}
 				}
 			}
@@ -81,8 +81,8 @@ func listAccountFederationUserFunc(c *config.Config) http.HandlerFunc {
 
 func getFederationUserFunc(c *config.Config) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		arn := requestToARN(r)
-		u, err := loadFederationUser(c, arn)
+		a := requestToARN(r)
+		u, err := loadFederationUser(c, a)
 		if err != nil {
 			if _, is404 := err.(vaultclient.ErrSecretNotFound); is404 {
 				respondGeneric(w, http.StatusNotFound, appcode.FEDERATIONUSER_UNKNOWN, "Federation user not found.")
@@ -98,8 +98,8 @@ func getFederationUserFunc(c *config.Config) http.HandlerFunc {
 
 func updateFederationUserFunc(c *config.Config) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		arn := requestToARN(r)
-		u, err := loadFederationUser(c, arn)
+		a := requestToARN(r)
+		u, err := loadFederationUser(c, a)
 		if err != nil {
 			if _, is404 := err.(vaultclient.ErrSecretNotFound); is404 {
 				respondGeneric(w, http.StatusNotFound, appcode.FEDERATIONUSER_UNKNOWN, "Federation user not found.")
@@ -113,7 +113,7 @@ func updateFederationUserFunc(c *config.Config) http.HandlerFunc {
 			respondGeneric(w, err.(ErrBadPostData).Code, appcode.BAD_DATA, err.Error())
 			return
 		}
-		if arn != fu.ARNString {
+		if a != fu.ARNString {
 			respondGeneric(w, http.StatusBadRequest, appcode.BAD_DATA, "ARN in posted data does not match the API path")
 			return
 		}
@@ -130,8 +130,8 @@ func updateFederationUserFunc(c *config.Config) http.HandlerFunc {
 
 func deleteFederationUserFunc(c *config.Config) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		arn := requestToARN(r)
-		u, err := loadFederationUser(c, arn)
+		a := requestToARN(r)
+		u, err := loadFederationUser(c, a)
 		if err != nil {
 			if _, is404 := err.(vaultclient.ErrSecretNotFound); is404 {
 				respondGeneric(w, http.StatusNotFound, appcode.FEDERATIONUSER_UNKNOWN, "Federation user not found.")
@@ -160,7 +160,7 @@ func createFederationUserFunc(c *config.Config) http.HandlerFunc {
 		u, err := loadFederationUser(c, fu.ARNString)
 		// Check that the federation user doesn't already exist
 		if err == nil {
-			respondGeneric(w, http.StatusBadRequest, appcode.FEDERATIONUSER_EXISTS, "Federation user not already exists.")
+			respondGeneric(w, http.StatusBadRequest, appcode.FEDERATIONUSER_EXISTS, "Federation user already exists.")
 			return
 		}
 		u.SetCredentials(fu.Credentials.AccessKeyID, fu.Credentials.SecretAccessKey, fu.Credentials.SessionToken, fu.Credentials.Expiration, fu.TTL, fu.MFASerialNumber, fu.MFASecret)
