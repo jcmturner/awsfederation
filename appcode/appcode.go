@@ -1,0 +1,9 @@
+package appcode
+
+const (
+	INFO_RESPONSE          = 0
+	BAD_DATA               = 1
+	FEDERATIONUSER_ERROR   = 100
+	FEDERATIONUSER_UNKNOWN = 101
+	FEDERATIONUSER_EXISTS  = 102
+)
