@@ -114,7 +114,7 @@ func updateFederationUserFunc(c *config.Config) http.HandlerFunc {
 			return
 		}
 		if a != fu.ARNString {
-			respondGeneric(w, http.StatusBadRequest, appcode.BAD_DATA, "ARN in posted data does not match the API path")
+			respondGeneric(w, http.StatusConflict, appcode.BAD_DATA, "ARN in posted data does not match the API path")
 			return
 		}
 		u.SetCredentials(fu.Credentials.AccessKeyID, fu.Credentials.SecretAccessKey, fu.Credentials.SessionToken, fu.Credentials.Expiration, fu.TTL, fu.MFASerialNumber, fu.MFASecret)
@@ -160,7 +160,7 @@ func createFederationUserFunc(c *config.Config) http.HandlerFunc {
 		u, err := loadFederationUser(c, fu.ARNString)
 		// Check that the federation user doesn't already exist
 		if err == nil {
-			respondGeneric(w, http.StatusBadRequest, appcode.FEDERATIONUSER_EXISTS, "Federation user already exists.")
+			respondGeneric(w, http.StatusConflict, appcode.FEDERATIONUSER_EXISTS, "Federation user already exists.")
 			return
 		}
 		u.SetCredentials(fu.Credentials.AccessKeyID, fu.Credentials.SecretAccessKey, fu.Credentials.SessionToken, fu.Credentials.Expiration, fu.TTL, fu.MFASerialNumber, fu.MFASecret)
