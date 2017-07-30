@@ -28,20 +28,29 @@ type FederationUserList struct {
 	FederationUsers []string
 }
 
-func NewFederationUser(c *config.Config, arnStr string) (FederationUser, error) {
-	a, err := ValidateFederationUserARN(arnStr)
+func NewFederationUser(c *config.Config, arn string) (FederationUser, error) {
+	a, err := ValidateFederationUserARN(arn)
 	if err != nil {
 		return FederationUser{}, err
 	}
-	p, err := awsvaultcredsprovider.NewVaultCredsProvider(arnStr, *c.Vault.Config, *c.Vault.Credentials)
+	p, err := awsvaultcredsprovider.NewVaultCredsProvider(arn, *c.Vault.Config, *c.Vault.Credentials)
 	if err != nil {
 		return FederationUser{}, fmt.Errorf("Error creating credentials provider: %v", err)
 	}
 	return FederationUser{
-		ARNString: arnStr,
+		ARNString: arn,
 		ARN:       a,
 		Provider:  p,
 	}, nil
+}
+
+func LoadFederationUser(c *config.Config, arn string) (FederationUser, error) {
+	u, err := NewFederationUser(c, arn)
+	if err != nil {
+		return u, err
+	}
+	err = u.Load()
+	return u, err
 }
 
 func ValidateFederationUserARN(arnStr string) (arn.ARN, error) {

@@ -11,11 +11,13 @@ import (
 	"log"
 	"net"
 	"os"
+	"time"
 )
 
 type Config struct {
-	Server       Server `json:"Server"`
-	Vault        Vault  `json:"Vault"`
+	Server   Server   `json:"Server"`
+	Vault    Vault    `json:"Vault"`
+	Database Database `json:"Database"`
 }
 
 type Vault struct {
@@ -29,6 +31,12 @@ type Server struct {
 	Logging *Loggers `json:"Logging"`
 }
 
+type Database struct {
+	DriverName           string
+	ConnectionString     string
+	CredentialsVaultPath string
+}
+
 type TLS struct {
 	Enabled         bool   `json:"Enabled"`
 	CertificateFile string `json:"CertificateFile"`
@@ -37,11 +45,19 @@ type TLS struct {
 
 type Loggers struct {
 	AuditFile         string `json:"Audit"`
-	AuditLogger       *log.Logger
+	AuditEncoder      *json.Encoder
 	ApplicationFile   string `json:"Application"`
 	ApplicationLogger *log.Logger
 	AccessLog         string `json:"Access"`
-	AccessEncoder      *json.Encoder
+	AccessEncoder     *json.Encoder
+}
+
+type AuditLogLine struct {
+	Username  string    `json:"Username"`
+	UserRealm string    `json:"UserRealm"`
+	Time      time.Time `json:"Time"`
+	EventType	string `json:"EventType"`
+	Detail    string    `json:"Detail"`
 }
 
 func Load(cfgPath string) (*Config, error) {
@@ -79,9 +95,9 @@ func NewConfig() *Config {
 		Server: Server{
 			Socket: "0.0.0.0:8443",
 			Logging: &Loggers{
-				AuditLogger:       dl,
+				AuditEncoder:       je,
 				ApplicationLogger: dl,
-				AccessEncoder: je,
+				AccessEncoder:     je,
 			},
 		},
 	}
@@ -104,8 +120,8 @@ func (c *Config) SetTLS(tlsConf TLS) *Config {
 	return c
 }
 
-func (c *Config) SetAuditLogger(l *log.Logger) *Config {
-	c.Server.Logging.AuditLogger = l
+func (c *Config) SetAuditLogger(e *json.Encoder) *Config {
+	c.Server.Logging.AuditEncoder = e
 	return c
 }
 
@@ -114,9 +130,9 @@ func (c *Config) SetAuditLogFile(p string) *Config {
 	if err != nil {
 		c.ApplicationLogf("Could not open audit log file: %v\n", err)
 	}
-	l := log.New(f, "Audit Log: ", log.Ldate|log.Ltime|log.Lshortfile)
 	c.Server.Logging.AuditFile = p
-	c.SetAuditLogger(l)
+	enc := json.NewEncoder(f)
+	c.SetAuditLogger(enc)
 	return c
 }
 
@@ -135,7 +151,6 @@ func (c *Config) SetApplicationLogFile(p string) *Config {
 	c.SetApplicationLogger(l)
 	return c
 }
-
 
 func (c *Config) SetAccessLogFile(p string) *Config {
 	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0640)
@@ -170,9 +185,21 @@ func NewTLSConfig(cert, key string) (TLS, error) {
 	}
 }
 
-func (c Config) AuditLogf(format string, v ...interface{}) {
-	if c.Server.Logging.AuditLogger != nil {
-		c.Server.Logging.AuditLogger.Printf(format, v)
+func (c Config) AccessLog(v interface{}) {
+	if c.Server.Logging.AuditEncoder != nil {
+		err := c.Server.Logging.AccessEncoder.Encode(v)
+		if err != nil {
+			c.ApplicationLogf("Could not log access event: %+v - Error: %v\n", err)
+		}
+	}
+}
+
+func (c Config) AuditLog(v interface{}) {
+	if c.Server.Logging.AuditEncoder != nil {
+		err := c.Server.Logging.AuditEncoder.Encode(v)
+		if err != nil {
+			c.ApplicationLogf("Could not log audit event: %+v - Error: %v\n", err)
+		}
 	}
 }
 

@@ -82,7 +82,7 @@ func listAccountFederationUserFunc(c *config.Config) http.HandlerFunc {
 func getFederationUserFunc(c *config.Config) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		a := requestToARN(r)
-		u, err := loadFederationUser(c, a)
+		u, err := federationuser.LoadFederationUser(c, a)
 		if err != nil {
 			if _, is404 := err.(vaultclient.ErrSecretNotFound); is404 {
 				respondGeneric(w, http.StatusNotFound, appcode.FEDERATIONUSER_UNKNOWN, "Federation user not found.")
@@ -99,7 +99,7 @@ func getFederationUserFunc(c *config.Config) http.HandlerFunc {
 func updateFederationUserFunc(c *config.Config) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		a := requestToARN(r)
-		u, err := loadFederationUser(c, a)
+		u, err := federationuser.LoadFederationUser(c, a)
 		if err != nil {
 			if _, is404 := err.(vaultclient.ErrSecretNotFound); is404 {
 				respondGeneric(w, http.StatusNotFound, appcode.FEDERATIONUSER_UNKNOWN, "Federation user not found.")
@@ -131,7 +131,7 @@ func updateFederationUserFunc(c *config.Config) http.HandlerFunc {
 func deleteFederationUserFunc(c *config.Config) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		a := requestToARN(r)
-		u, err := loadFederationUser(c, a)
+		u, err := federationuser.LoadFederationUser(c, a)
 		if err != nil {
 			if _, is404 := err.(vaultclient.ErrSecretNotFound); is404 {
 				respondGeneric(w, http.StatusNotFound, appcode.FEDERATIONUSER_UNKNOWN, "Federation user not found.")
@@ -157,7 +157,7 @@ func createFederationUserFunc(c *config.Config) http.HandlerFunc {
 			respondGeneric(w, err.(ErrBadPostData).Code, appcode.BAD_DATA, err.Error())
 			return
 		}
-		u, err := loadFederationUser(c, fu.ARNString)
+		u, err := federationuser.LoadFederationUser(c, fu.ARNString)
 		// Check that the federation user doesn't already exist
 		if err == nil {
 			respondGeneric(w, http.StatusConflict, appcode.FEDERATIONUSER_EXISTS, "Federation user already exists.")
@@ -226,15 +226,6 @@ func requestToARN(r *http.Request) string {
 	var accountID string = vars[MuxVarAccountID]
 	var username string = vars[MuxVarUsername]
 	return fmt.Sprintf(federationuser.FedUserARNFormat, accountID, username)
-}
-
-func loadFederationUser(c *config.Config, arn string) (federationuser.FederationUser, error) {
-	u, err := federationuser.NewFederationUser(c, arn)
-	if err != nil {
-		return u, err
-	}
-	err = u.Load()
-	return u, err
 }
 
 func getListIAMUsers(c *config.Config, accountIDs []string) ([]string, error) {

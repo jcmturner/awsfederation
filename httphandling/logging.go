@@ -36,9 +36,6 @@ func AccessLogger(inner http.Handler, c *config.Config) http.Handler {
 			Time:        start,
 			Duration:    time.Since(start),
 		}
-		err := c.Server.Logging.AccessEncoder.Encode(l)
-		if err != nil {
-			c.ApplicationLogf("Could not log access event: %v\n", err)
-		}
+		c.AccessLog(l)
 	})
 }
