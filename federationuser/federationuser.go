@@ -6,6 +6,7 @@ import (
 	"github.com/jcmturner/awsfederation/arn"
 	"github.com/jcmturner/awsfederation/awscredential"
 	"github.com/jcmturner/awsfederation/config"
+	"github.com/jcmturner/awsfederation/database"
 	"github.com/jcmturner/awsvaultcredsprovider"
 	"time"
 )
@@ -15,6 +16,7 @@ const (
 )
 
 type FederationUser struct {
+	Name            string                                    `json:"Name"`
 	ARNString       string                                    `json:"Arn"`
 	Credentials     awscredential.Credentials                 `json:"Credentials"`
 	TTL             int64                                     `json:"TTL"`
@@ -73,14 +75,31 @@ func (u *FederationUser) SetCredentials(accessKey, secretKey string, sessionToke
 	u.Credentials.SecretAccessKey = "REDACTED"
 }
 
-func (u *FederationUser) Store() error {
+func (u *FederationUser) SetName(name string) *FederationUser {
+	u.Name = name
+	u.Provider.Name = name
+	return u
+}
+
+func (u *FederationUser) Store(stmtMap database.StmtMap) error {
 	if u.Provider == nil {
 		return errors.New("Provider not defined, cannot store credentials")
 	}
 	if u.Provider.Credential.AccessKeyId == "" {
 		return errors.New("User does not have credentials defined to be stored")
 	}
-	return u.Provider.Store()
+	err := u.Provider.Store()
+	if err != nil {
+		return err
+	}
+	if stmt, ok := stmtMap[database.StmtKeyFedUserInsert]; ok {
+		_, err := stmt.Exec(u.ARNString)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	return errors.New("Prepared statement for DB authorization check not found")
 }
 
 func (u *FederationUser) Load() error {
@@ -90,6 +109,7 @@ func (u *FederationUser) Load() error {
 	if err := u.Provider.Read(); err != nil {
 		return err
 	}
+	u.Name = u.Provider.Name
 	u.Credentials.AccessKeyID = u.Provider.Credential.AccessKeyId
 	u.Credentials.SecretAccessKey = "REDACTED"
 	u.Credentials.Expiration = u.Provider.Credential.Expiration
@@ -102,9 +122,20 @@ func (u *FederationUser) Load() error {
 	return nil
 }
 
-func (u *FederationUser) Delete() error {
+func (u *FederationUser) Delete(stmtMap database.StmtMap) error {
 	if u.Provider == nil {
 		return errors.New("Provider not defined, cannot delete credentials")
+	}
+	if stmt, ok := stmtMap[database.StmtKeyFedUserDelete]; !ok {
+		return errors.New("Prepared statement for DB authorization check not found")
+	} else {
+		r, err := stmt.Exec(u.ARNString)
+		if err != nil {
+			return err
+		}
+		if i, _ := r.RowsAffected(); i != 1 {
+			return fmt.Errorf("Expected 1 and only 1 row to be affected. Number affected was: %v", i)
+		}
 	}
 	return u.Provider.Delete()
 }

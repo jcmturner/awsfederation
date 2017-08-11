@@ -1,13 +1,12 @@
 package httphandling
 
 import (
-	"github.com/jcmturner/vaultclient"
+	"fmt"
 	"github.com/jcmturner/awsfederation/appcode"
 	"github.com/jcmturner/awsfederation/config"
-	"net/http"
-	"fmt"
 	"github.com/jcmturner/awsfederation/federationuser"
-	"github.com/jcmturner/awsfederation/sts"
+	"github.com/jcmturner/vaultclient"
+	"net/http"
 )
 
 func getAssumeRoleFunc(c *config.Config) http.HandlerFunc {
@@ -16,7 +15,6 @@ func getAssumeRoleFunc(c *config.Config) http.HandlerFunc {
 
 		// TODO authorization check that user should have access to this role. Authorization check should also get the duration and policy authorized for this user. If the user if authorised by more than one
 		// TODO resolve which federation user to use for this
-
 
 		u, err := federationuser.LoadFederationUser(c, a)
 		if err != nil {

@@ -1,21 +1,26 @@
 package database
 
 const (
-	StmtKeyAuthzCheck = 1
-	queryAuthzCheck = "SELECT AuthzAttrib FROM RoleMapping WHERE id =?"
+	StmtKeyAuthzCheck        = 1
+	QueryAuthzCheck          = "SELECT authzAttribute FROM roleMapping WHERE id =?"
 	StmtKeyRoleMappingLookup = 2
-	queryRoleMappingLookup = "SELECT RoleArn, FederationUser, SessionDuration, Policy, RoleSessionName FROM RoleMapping WHERE id = ?"
+	QueryRoleMappingLookup   = "SELECT role.arn, federationUser.arn, duration, policy, roleSessionNameFormat " +
+		"FROM roleMapping " +
+		"JOIN role ON roleMapping.role_arn = role.arn " +
+		"JOIN account ON role.account_id = account.id " +
+		"JOIN federationUser ON account.federationUser_arn = federationUser.arn " +
+		"WHERE roleMapping.id = ?"
 )
 
 func getAssumeRoleStmts() []Statement {
-	return []Statement {
+	return []Statement{
 		{
-			ID: StmtKeyAuthzCheck,
-			Query: queryAuthzCheck,
+			ID:    StmtKeyAuthzCheck,
+			Query: QueryAuthzCheck,
 		},
 		{
-			ID: StmtKeyRoleMappingLookup,
-			Query: queryRoleMappingLookup,
+			ID:    StmtKeyRoleMappingLookup,
+			Query: QueryRoleMappingLookup,
 		},
 	}
 }

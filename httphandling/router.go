@@ -3,6 +3,7 @@ package httphandling
 import (
 	"github.com/gorilla/mux"
 	"github.com/jcmturner/awsfederation/config"
+	"github.com/jcmturner/awsfederation/database"
 	"net/http"
 )
 
@@ -17,9 +18,9 @@ type Route struct {
 	HandlerFunc http.HandlerFunc
 }
 
-func NewRouter(c *config.Config) *mux.Router {
+func NewRouter(c *config.Config, stmtMap *database.StmtMap) *mux.Router {
 	router := mux.NewRouter().StrictSlash(true)
-	addRoutes(router, getFederationUserRoutes(c), c)
+	addRoutes(router, getFederationUserRoutes(c, stmtMap), c)
 
 	return router
 }
@@ -32,7 +33,7 @@ func addRoutes(router *mux.Router, routes []Route, c *config.Config) *mux.Router
 		handler = WrapCommonHandler(handler, c)
 
 		router.
-		Methods(route.Method).
+			Methods(route.Method).
 			Path(route.Pattern).
 			Name(route.Name).
 			Handler(handler)
@@ -40,4 +41,3 @@ func addRoutes(router *mux.Router, routes []Route, c *config.Config) *mux.Router
 
 	return router
 }
-

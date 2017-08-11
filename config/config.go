@@ -32,9 +32,8 @@ type Server struct {
 }
 
 type Database struct {
-	DriverName           string
-	ConnectionString     string
-	CredentialsVaultPath string
+	ConnectionString     string `json:"ConnectionString"`
+	CredentialsVaultPath string `json:"CredentialsVaultPath"`
 }
 
 type TLS struct {
@@ -56,7 +55,7 @@ type AuditLogLine struct {
 	Username  string    `json:"Username"`
 	UserRealm string    `json:"UserRealm"`
 	Time      time.Time `json:"Time"`
-	EventType	string `json:"EventType"`
+	EventType string    `json:"EventType"`
 	Detail    string    `json:"Detail"`
 }
 
@@ -65,14 +64,19 @@ func Load(cfgPath string) (*Config, error) {
 	if err != nil {
 		return &Config{}, fmt.Errorf("Could not load configuration: %v", err)
 	}
+	return Parse(j)
+}
+
+func Parse(b []byte) (*Config, error) {
 	c := NewConfig()
-	err = json.Unmarshal(j, &c)
+	err := json.Unmarshal(b, &c)
 	if err != nil {
 		return &Config{}, fmt.Errorf("Configuration file could not be parsed: %v", err)
 	}
 	c.SetApplicationLogFile(c.Server.Logging.ApplicationFile)
 	c.SetAuditLogFile(c.Server.Logging.AuditFile)
 	c.SetAccessLogFile(c.Server.Logging.AccessLog)
+	c.Vault.Config.ReSTClientConfig.WithCAFilePath(*c.Vault.Config.ReSTClientConfig.TrustCACert)
 	err = c.Vault.Credentials.ReadUserID()
 	if err != nil {
 		c.ApplicationLogf(err.Error())
@@ -95,7 +99,7 @@ func NewConfig() *Config {
 		Server: Server{
 			Socket: "0.0.0.0:8443",
 			Logging: &Loggers{
-				AuditEncoder:       je,
+				AuditEncoder:      je,
 				ApplicationLogger: dl,
 				AccessEncoder:     je,
 			},
@@ -126,6 +130,9 @@ func (c *Config) SetAuditLogger(e *json.Encoder) *Config {
 }
 
 func (c *Config) SetAuditLogFile(p string) *Config {
+	if p == "" {
+		return c
+	}
 	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0640)
 	if err != nil {
 		c.ApplicationLogf("Could not open audit log file: %v\n", err)
@@ -142,6 +149,9 @@ func (c *Config) SetApplicationLogger(l *log.Logger) *Config {
 }
 
 func (c *Config) SetApplicationLogFile(p string) *Config {
+	if p == "" {
+		return c
+	}
 	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		c.ApplicationLogf("Could not open application log file: %v\n", err)
@@ -153,6 +163,9 @@ func (c *Config) SetApplicationLogFile(p string) *Config {
 }
 
 func (c *Config) SetAccessLogFile(p string) *Config {
+	if p == "" {
+		return c
+	}
 	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0640)
 	if err != nil {
 		c.ApplicationLogf("Could not open access log file: %v\n", err)

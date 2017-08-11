@@ -7,6 +7,7 @@ import (
 	"github.com/jcmturner/awsfederation/appcode"
 	"github.com/jcmturner/awsfederation/arn"
 	"github.com/jcmturner/awsfederation/config"
+	"github.com/jcmturner/awsfederation/database"
 	"github.com/jcmturner/awsfederation/federationuser"
 	"github.com/jcmturner/vaultclient"
 	"io"
@@ -96,7 +97,7 @@ func getFederationUserFunc(c *config.Config) http.HandlerFunc {
 	})
 }
 
-func updateFederationUserFunc(c *config.Config) http.HandlerFunc {
+func updateFederationUserFunc(c *config.Config, stmtMap *database.StmtMap) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		a := requestToARN(r)
 		u, err := federationuser.LoadFederationUser(c, a)
@@ -118,7 +119,7 @@ func updateFederationUserFunc(c *config.Config) http.HandlerFunc {
 			return
 		}
 		u.SetCredentials(fu.Credentials.AccessKeyID, fu.Credentials.SecretAccessKey, fu.Credentials.SessionToken, fu.Credentials.Expiration, fu.TTL, fu.MFASerialNumber, fu.MFASecret)
-		err = u.Store()
+		err = u.Store(*stmtMap)
 		if err != nil {
 			respondGeneric(w, http.StatusInternalServerError, appcode.FEDERATIONUSER_ERROR, fmt.Sprintf("Error storing federation user in vault: %v", err))
 			return
@@ -128,7 +129,7 @@ func updateFederationUserFunc(c *config.Config) http.HandlerFunc {
 	})
 }
 
-func deleteFederationUserFunc(c *config.Config) http.HandlerFunc {
+func deleteFederationUserFunc(c *config.Config, stmtMap *database.StmtMap) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		a := requestToARN(r)
 		u, err := federationuser.LoadFederationUser(c, a)
@@ -140,7 +141,7 @@ func deleteFederationUserFunc(c *config.Config) http.HandlerFunc {
 			respondGeneric(w, http.StatusInternalServerError, appcode.FEDERATIONUSER_ERROR, err.Error())
 			return
 		}
-		err = u.Delete()
+		err = u.Delete(*stmtMap)
 		if err != nil {
 			respondGeneric(w, http.StatusInternalServerError, appcode.FEDERATIONUSER_ERROR, err.Error())
 			return
@@ -150,7 +151,7 @@ func deleteFederationUserFunc(c *config.Config) http.HandlerFunc {
 	})
 }
 
-func createFederationUserFunc(c *config.Config) http.HandlerFunc {
+func createFederationUserFunc(c *config.Config, stmtMap *database.StmtMap) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fu, err := processFederationUserPostData(r)
 		if err != nil {
@@ -164,7 +165,7 @@ func createFederationUserFunc(c *config.Config) http.HandlerFunc {
 			return
 		}
 		u.SetCredentials(fu.Credentials.AccessKeyID, fu.Credentials.SecretAccessKey, fu.Credentials.SessionToken, fu.Credentials.Expiration, fu.TTL, fu.MFASerialNumber, fu.MFASecret)
-		err = u.Store()
+		err = u.Store(*stmtMap)
 		if err != nil {
 			respondGeneric(w, http.StatusInternalServerError, appcode.FEDERATIONUSER_ERROR, fmt.Sprintf("Error storing federation user in vault: %v", err))
 			return
@@ -174,7 +175,7 @@ func createFederationUserFunc(c *config.Config) http.HandlerFunc {
 	})
 }
 
-func getFederationUserRoutes(c *config.Config) []Route {
+func getFederationUserRoutes(c *config.Config, stmtMap *database.StmtMap) []Route {
 	return []Route{
 		{
 			Name:        "FederationUserAllList",
@@ -198,19 +199,19 @@ func getFederationUserRoutes(c *config.Config) []Route {
 			Name:        "FederationUserUpdate",
 			Method:      "PUT",
 			Pattern:     fmt.Sprintf("/"+APIVersion+"/federationuser/"+federationuser.FedUserARNFormat, "{"+MuxVarAccountID+":[0-9]{12}}", "{"+MuxVarUsername+"}"),
-			HandlerFunc: updateFederationUserFunc(c),
+			HandlerFunc: updateFederationUserFunc(c, stmtMap),
 		},
 		{
 			Name:        "FederationUserDelete",
 			Method:      "DELETE",
 			Pattern:     fmt.Sprintf("/"+APIVersion+"/federationuser/"+federationuser.FedUserARNFormat, "{"+MuxVarAccountID+":[0-9]{12}}", "{"+MuxVarUsername+"}"),
-			HandlerFunc: deleteFederationUserFunc(c),
+			HandlerFunc: deleteFederationUserFunc(c, stmtMap),
 		},
 		{
 			Name:        "FederationUserCreate",
 			Method:      "POST",
 			Pattern:     fmt.Sprintf("/" + APIVersion + "/federationuser"),
-			HandlerFunc: createFederationUserFunc(c),
+			HandlerFunc: createFederationUserFunc(c, stmtMap),
 		},
 		{
 			Name:        "FederationUserCreateNotAllowed",

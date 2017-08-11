@@ -1,30 +1,30 @@
 package assumerole
 
 import (
-	"github.com/jcmturner/awsfederation/database"
-	"github.com/jcmturner/goidentity"
-	"errors"
-	"github.com/hashicorp/go-uuid"
-	"github.com/jcmturner/awsfederation/federationuser"
-	"github.com/jcmturner/awsfederation/config"
-	"fmt"
-	"strings"
-	"strconv"
-	"time"
-	"github.com/jcmturner/awsfederation/sts"
-	awssts "github.com/aws/aws-sdk-go/service/sts"
 	"encoding/json"
+	"errors"
+	"fmt"
+	awssts "github.com/aws/aws-sdk-go/service/sts"
+	"github.com/hashicorp/go-uuid"
+	"github.com/jcmturner/awsfederation/config"
+	"github.com/jcmturner/awsfederation/database"
+	"github.com/jcmturner/awsfederation/federationuser"
+	"github.com/jcmturner/awsfederation/sts"
+	"github.com/jcmturner/goidentity"
 	"net/url"
+	"strconv"
+	"strings"
+	"time"
 )
 
 type AuditDetail struct {
-	Successful bool
-	RoleMappingID string
-	RoleArn string
+	Successful      bool
+	RoleMappingID   string
+	RoleArn         string
 	RoleSessionName string
 	SessionDuration time.Duration
-	FederationUser string
-	Comment string
+	FederationUser  string
+	Comment         string
 }
 
 func auditLog(l config.AuditLogLine, d AuditDetail, c *config.Config) {
@@ -33,62 +33,55 @@ func auditLog(l config.AuditLogLine, d AuditDetail, c *config.Config) {
 	c.AccessLog(l)
 }
 
-func Federate(u goidentity.Identity, id string, stmtMap *database.StmtMap, fc *federationuser.FedUserCache, c config.Config) (*awssts.AssumeRoleOutput, error) {
+func Federate(u goidentity.Identity, id string, stmtMap database.StmtMap, fc *federationuser.FedUserCache, c *config.Config) (o *awssts.AssumeRoleOutput, err error) {
 	auditLine := config.AuditLogLine{
-		Username: u.UserName(),
+		Username:  u.UserName(),
 		UserRealm: u.Domain(),
 		EventType: "AssumeRoleFederation",
-		Time: time.Now().UTC(),
+		Time:      time.Now().UTC(),
+	}
+	d := AuditDetail{
+		RoleMappingID:   id,
+		RoleSessionName: "NA",
+		SessionDuration: time.Duration(0),
+		FederationUser:  "NA",
 	}
 
-	if ok, err := Authorize(u, id, stmtMap); ok {
-		role, fu, duration, policy, roleSessionNameFmt, err := RoleMappingLookup(id, stmtMap)
-		if err != nil {
-			d := AuditDetail{
-				Successful: false,
-				RoleMappingID: id,
-				RoleArn: role,
-				RoleSessionName: "NA",
-				SessionDuration: time.Duration(0),
-				FederationUser: fu,
-				Comment: fmt.Sprintf("Error getting role mapping details: %v", err),
-			}
-			auditLog(auditLine, d, c)
-			return awssts.AssumeRoleOutput{}, fmt.Errorf("Error getting role mapping details: %v", err)
-		}
-		o, err := sts.Federate(c, fc, fu, role, roleSessionNamef(roleSessionNameFmt, u), policy, duration)
-		if err != nil {
-			d := AuditDetail{
-				Successful: false,
-				RoleMappingID: id,
-				RoleArn: role,
-				RoleSessionName: o.AssumedRoleUser.String(),
-				SessionDuration: time.Duration(duration),
-				FederationUser: fu,
-				Comment: fmt.Sprintf("Error performing federation: %v", err),
-			}
-			auditLog(auditLine, d, c)
-			return o, fmt.Errorf("Error performing federation: %v", err)
-		}
-		return o, nil
-	} else if err != nil {
-		d := AuditDetail{
-			Successful: false,
-			RoleMappingID: id,
-			RoleSessionName: "NA",
-			SessionDuration: time.Duration(0),
-			FederationUser: fu,
-			Comment: fmt.Sprintf("Error getting role mapping details: %v", err),
-		}
+	var authzed bool
+	authzed, err = Authorize(u, id, stmtMap)
+	if err != nil {
+		d.Comment = fmt.Sprintf("Authorization check failed with error: %v", err)
 		auditLog(auditLine, d, c)
-		return awssts.AssumeRoleOutput{}, err
-	} else {
-
+		return
 	}
-
+	if authzed {
+		role, fu, duration, policy, roleSessionNameFmt, e := RoleMappingLookup(id, stmtMap)
+		if e != nil {
+			err = fmt.Errorf("Error getting role mapping details: %v", e)
+			d.Comment = err.Error()
+			auditLog(auditLine, d, c)
+			return
+		}
+		d.RoleArn = role
+		d.FederationUser = fu
+		o, err = sts.Federate(c, fc, fu, role, roleSessionNamef(roleSessionNameFmt, u), policy, duration)
+		if err != nil {
+			err = fmt.Errorf("Error performing federation: %v", err)
+			d.RoleSessionName = o.AssumedRoleUser.String()
+			d.SessionDuration = time.Duration(duration)
+			d.Comment = err.Error()
+			auditLog(auditLine, d, c)
+			return
+		}
+		return
+	} else {
+		d.Comment = "User not authorized"
+		auditLog(auditLine, d, c)
+		return
+	}
 }
 
-func Authorize(u goidentity.Identity, id string, stmtMap *database.StmtMap) (bool, error) {
+func Authorize(u goidentity.Identity, id string, stmtMap database.StmtMap) (bool, error) {
 	// Validate id format. Ensure no SQL injection.
 	if _, err := uuid.ParseUUID(id); err != nil {
 		return false, errors.New("Role mapping ID not valid")
@@ -114,29 +107,22 @@ func Authorize(u goidentity.Identity, id string, stmtMap *database.StmtMap) (boo
 	return false, errors.New("Prepared statement for DB authorization check not found")
 }
 
-func RoleMappingLookup(id string, stmtMap *database.StmtMap) (string, string, int, string, string, error) {
+func RoleMappingLookup(id string, stmtMap database.StmtMap) (role string, fuStr string, duration int64, policyStr string, roleSessionNameFmt string, err error) {
 	// Validate id format. Ensure no SQL injection.
-	if _, err := uuid.ParseUUID(id); err != nil {
-		return false, errors.New("Role mapping ID not valid")
+	if _, err = uuid.ParseUUID(id); err != nil {
+		return
 	}
-	var (
-		role string
-		fuStr string
-		durationInt int64
-		policyStr string
-		roleSessionNameFmt string
-	)
 	if stmt, ok := stmtMap[database.StmtKeyRoleMappingLookup]; ok {
-		err := stmt.QueryRow(id).Scan(&role, &fuStr, &durationInt, &policyStr, &roleSessionNameFmt)
+		err := stmt.QueryRow(id).Scan(&role, &fuStr, &duration, &policyStr, &roleSessionNameFmt)
 		if err != nil {
-			return role, fuStr, durationInt, policyStr, roleSessionNameFmt, err
+			return role, fuStr, duration, policyStr, roleSessionNameFmt, err
 		}
-		return role, fuStr, durationInt, policyStr, roleSessionNameFmt, nil
+		return role, fuStr, duration, policyStr, roleSessionNameFmt, nil
 	}
-	return role, fuStr, durationInt, policyStr, roleSessionNameFmt, errors.New("Prepared statement for DB role mapping lookup check not found")
+	return role, fuStr, duration, policyStr, roleSessionNameFmt, errors.New("Prepared statement for DB role mapping lookup check not found")
 }
 
-func roleSessionNamef (format string, u goidentity.Identity) string {
+func roleSessionNamef(format string, u goidentity.Identity) string {
 	format = strings.Replace(format, "${username}", u.UserName(), -1)
 	format = strings.Replace(format, "${displayname}", u.DisplayName(), -1)
 	format = strings.Replace(format, "${domain}", u.Domain(), -1)

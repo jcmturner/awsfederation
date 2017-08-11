@@ -50,11 +50,18 @@ const (
 			"UserIDFile": "%s"
 		}
 
+	},
+	"Database": {
+		"ConnectionString": "%s",
+		"CredentialsVaultPath": "%s"
 	}
 }
 `
 	Test_SecretsPath     = "/secret/awskeys/"
+	Test_DB_Conn         = "${username}:${password}@tcp(127.0.0.1:3306)/awsfederation"
+	Test_DB_Creds_Path   = "/secret/dbcreds/"
 	Test_Arn_Stub        = "arn:aws:iam::123456789012:user"
+	Test_FedName         = "TestFedUser"
 	Test_Arn             = "arn:aws:iam::123456789012:user/test"
 	Test_SecretAccessKey = "9drTJvcXLB89EXAMPLELB8923FB892xMFI"
 	Test_SessionToken    = "AQoXdzELDDY//////////wEaoAK1wvxJY12r2IrDFT2IvAzTCn3zHoZ7YNtpiQLF0MqZye/qwjzP2iEXAMPLEbw/m3hsj8VBTkPORGvr9jM5sgP+w9IZWZnU+LWhmg+a5fDi2oTGUYcdg9uexQ4mtCHIHfi4citgqZTgco40Yqr4lIlo4V2b2Dyauk0eYFNebHtYlFVgAUj+7Indz3LU0aTWk1WKIjHmmMCIoTkyYp/k7kUG7moeEYKSitwQIi6Gjn+nyzM+PtoA3685ixzv0R7i5rjQi0YE0lf1oeie3bDiNHncmzosRM6SFiPzSvp6h/32xQuZsjcypmwsPSDtTPYcs0+YN/8BRi2/IcrxSpnWEXAMPLEXSDFTAQAM6Dl9zR0tXoybnlrZIwMLlMi1Kcgo5OytwU="
@@ -62,6 +69,7 @@ const (
 	Test_AccessKeyId     = "ASIAJEXAMPLEXEG2JICEA"
 
 	Test_Arn_Stub2        = "arn:aws:iam::223456789012:user"
+	Test_FedName2         = "TestFedUser2"
 	Test_Arn2             = "arn:aws:iam::223456789012:user/test2"
 	Test_SecretAccessKey2 = "9dje5ucXLB89EXAMPLELB8923FB892xMFI"
 	Test_SessionToken2    = "BQoXdzELDDY//////////wEaoAK1wvxJY12r2IrDFT2IvAzTCn3zHoZ7YNtpiQLF0MqZye/qwjzP2iEXAMPLEbw/m3hsj8VBTkPORGvr9jM5sgP+w9IZWZnU+LWhmg+a5fDi2oTGUYcdg9uexQ4mtCHIHfi4citgqZTgco40Yqr4lIlo4V2b2Dyauk0eYFNebHtYlFVgAUj+7Indz3LU0aTWk1WKIjHmmMCIoTkyYp/k7kUG7moeEYKSitwQIi6Gjn+nyzM+PtoA3685ixzv0R7i5rjQi0YE0lf1oeie3bDiNHncmzosRM6SFiPzSvp6h/32xQuZsjcypmwsPSDtTPYcs0+YN/8BRi2/IcrxSpnWEXAMPLEXSDFTAQAM6Dl9zR0tXoybnlrZIwMLlMi1Kcgo5OytwU="
@@ -71,7 +79,7 @@ const (
 	Test_MFASecret2       = "V2NFI2CRKFCMZJD232ONV5OLVPN5H3ZO2553QHFPXJK4BJN4X3JBYEQ6DJSBXE7H"
 )
 
-func TestFederationUser(t *testing.T) {
+func TestFederationUserRestAPI(t *testing.T) {
 	a, v := initServer(t)
 	defer v.Close()
 
@@ -86,18 +94,18 @@ func TestFederationUser(t *testing.T) {
 		{"GET", "/" + httphandling.APIVersion + "/federationuser", "", http.StatusOK, "{\"FederationUsers\":[\"" + Test_Arn + "\"]}"},
 		{"GET", "/" + httphandling.APIVersion + "/federationuser/" + Test_Arn_Stub, "", http.StatusOK, "{\"FederationUsers\":[\"" + Test_Arn + "\"]}"},
 		{"GET", "/" + httphandling.APIVersion + "/federationuser/arn:aws:iam::123456789012:user/notexist", "", http.StatusNotFound, "{\"Message\":\"Federation user not found.\",\"HTTPCode\":404,\"ApplicationCode\":101}"},
-		{"POST", "/" + httphandling.APIVersion + "/federationuser", "{\"Arn\":\"" + Test_Arn + "\",\"Credentials\":{\"SecretAccessKey\":\"REDACTED\",\"SessionToken\":\"\",\"Expiration\":\"" + Test_Expiration + "\",\"AccessKeyId\":\"" + Test_AccessKeyId + "\"},\"TTL\":0,\"MFASerialNumber\":\"\",\"MFASecret\":\"\"}", http.StatusConflict, "{\"Message\":\"Federation user already exists.\",\"HTTPCode\":409,\"ApplicationCode\":102}"},
+		{"POST", "/" + httphandling.APIVersion + "/federationuser", "{\"Name\":\"" + Test_FedName + "\",\"Arn\":\"" + Test_Arn + "\",\"Credentials\":{\"SecretAccessKey\":\"REDACTED\",\"SessionToken\":\"\",\"Expiration\":\"" + Test_Expiration + "\",\"AccessKeyId\":\"" + Test_AccessKeyId + "\"},\"TTL\":0,\"MFASerialNumber\":\"\",\"MFASecret\":\"\"}", http.StatusConflict, "{\"Message\":\"Federation user already exists.\",\"HTTPCode\":409,\"ApplicationCode\":102}"},
 		{"POST", "/" + httphandling.APIVersion + "/federationuser/" + Test_Arn, "{\"Arn\":\"" + Test_Arn + "\",\"Credentials\":{\"SecretAccessKey\":\"" + Test_SecretAccessKey2 + "\",\"SessionToken\":\"" + Test_SessionToken2 + "\",\"Expiration\":\"" + Test_Expiration2 + "\",\"AccessKeyId\":\"" + Test_AccessKeyId2 + "\"},\"TTL\":12,\"MFASerialNumber\":\"" + Test_MFASerial2 + "\",\"MFASecret\":\"" + Test_MFASecret2 + "\"}", http.StatusMethodNotAllowed, "{\"Message\":\"The POST method cannot be performed against this part of the API\",\"HTTPCode\":405,\"ApplicationCode\":1}"},
-		{"POST", "/" + httphandling.APIVersion + "/federationuser", "{\"Arn\":\"" + Test_Arn2 + "\",\"Credentials\":{\"SecretAccessKey\":\"" + Test_SecretAccessKey2 + "\",\"SessionToken\":\"" + Test_SessionToken2 + "\",\"Expiration\":\"" + Test_Expiration2 + "\",\"AccessKeyId\":\"" + Test_AccessKeyId2 + "\"},\"TTL\":12,\"MFASerialNumber\":\"" + Test_MFASerial2 + "\",\"MFASecret\":\"" + Test_MFASecret2 + "\"}", http.StatusOK, "{\"Message\":\"Federation user " + Test_Arn2 + " created.\",\"HTTPCode\":200,\"ApplicationCode\":0}"},
+		{"POST", "/" + httphandling.APIVersion + "/federationuser", "{\"Name\":\"" + Test_FedName2 + "\",\"Arn\":\"" + Test_Arn2 + "\",\"Credentials\":{\"SecretAccessKey\":\"" + Test_SecretAccessKey2 + "\",\"SessionToken\":\"" + Test_SessionToken2 + "\",\"Expiration\":\"" + Test_Expiration2 + "\",\"AccessKeyId\":\"" + Test_AccessKeyId2 + "\"},\"TTL\":12,\"MFASerialNumber\":\"" + Test_MFASerial2 + "\",\"MFASecret\":\"" + Test_MFASecret2 + "\"}", http.StatusOK, "{\"Message\":\"Federation user " + Test_Arn2 + " created.\",\"HTTPCode\":200,\"ApplicationCode\":0}"},
 		{"DELETE", "/" + httphandling.APIVersion + "/federationuser/" + Test_Arn2, "", http.StatusOK, "{\"Message\":\"Federation user " + Test_Arn2 + " deleted.\",\"HTTPCode\":200,\"ApplicationCode\":0}"},
 		{"GET", "/" + httphandling.APIVersion + "/federationuser/" + Test_Arn2, "", http.StatusNotFound, "{\"Message\":\"Federation user not found.\",\"HTTPCode\":404,\"ApplicationCode\":101}"},
-		{"POST", "/" + httphandling.APIVersion + "/federationuser", "{\"Arn\":\"" + Test_Arn2 + "\",\"Credentials\":{\"SecretAccessKey\":\"" + Test_SecretAccessKey2 + "\",\"SessionToken\":\"" + Test_SessionToken2 + "\",\"Expiration\":\"" + Test_Expiration2 + "\",\"AccessKeyId\":\"" + Test_AccessKeyId2 + "\"},\"TTL\":12,\"MFASerialNumber\":\"" + Test_MFASerial2 + "\",\"MFASecret\":\"" + Test_MFASecret2 + "\"}", http.StatusOK, "{\"Message\":\"Federation user " + Test_Arn2 + " created.\",\"HTTPCode\":200,\"ApplicationCode\":0}"},
+		{"POST", "/" + httphandling.APIVersion + "/federationuser", "{\"Name\":\"" + Test_FedName2 + "\",\"Arn\":\"" + Test_Arn2 + "\",\"Credentials\":{\"SecretAccessKey\":\"" + Test_SecretAccessKey2 + "\",\"SessionToken\":\"" + Test_SessionToken2 + "\",\"Expiration\":\"" + Test_Expiration2 + "\",\"AccessKeyId\":\"" + Test_AccessKeyId2 + "\"},\"TTL\":12,\"MFASerialNumber\":\"" + Test_MFASerial2 + "\",\"MFASecret\":\"" + Test_MFASecret2 + "\"}", http.StatusOK, "{\"Message\":\"Federation user " + Test_Arn2 + " created.\",\"HTTPCode\":200,\"ApplicationCode\":0}"},
 		{"GET", "/" + httphandling.APIVersion + "/federationuser/" + Test_Arn2, "", http.StatusOK, "{\"Arn\":\"" + Test_Arn2 + "\",\"Credentials\":{\"SecretAccessKey\":\"REDACTED\",\"SessionToken\":\"REDACTED\",\"Expiration\":\"" + Test_Expiration2 + "\",\"AccessKeyId\":\"" + Test_AccessKeyId2 + "\"},\"TTL\":12,\"MFASerialNumber\":\"" + Test_MFASerial2 + "\",\"MFASecret\":\"REDACTED\"}"},
 		{"GET", "/" + httphandling.APIVersion + "/federationuser", "", http.StatusOK, "{\"FederationUsers\":[\"" + Test_Arn + "\",\"" + Test_Arn2 + "\"]}"},
 		{"GET", "/" + httphandling.APIVersion + "/federationuser/" + Test_Arn_Stub, "", http.StatusOK, "{\"FederationUsers\":[\"" + Test_Arn + "\"]}"},
 		{"GET", "/" + httphandling.APIVersion + "/federationuser/" + Test_Arn_Stub2, "", http.StatusOK, "{\"FederationUsers\":[\"" + Test_Arn2 + "\"]}"},
-		{"PUT", "/" + httphandling.APIVersion + "/federationuser/" + Test_Arn_Stub + "/blah", "{\"Arn\":\"" + Test_Arn + "\",\"Credentials\":{\"SecretAccessKey\":\"REDACTED\",\"SessionToken\":\"REDACTED\",\"Expiration\":\"" + Test_Expiration + "\",\"AccessKeyId\":\"" + Test_AccessKeyId2 + "\"},\"TTL\":0,\"MFASerialNumber\":\"\",\"MFASecret\":\"\"}", http.StatusNotFound, "{\"Message\":\"Federation user not found.\",\"HTTPCode\":404,\"ApplicationCode\":101}"},
-		{"PUT", "/" + httphandling.APIVersion + "/federationuser/" + Test_Arn, "{\"Arn\":\"" + Test_Arn + "\",\"Credentials\":{\"SecretAccessKey\":\"REDACTED\",\"SessionToken\":\"REDACTED\",\"Expiration\":\"" + Test_Expiration + "\",\"AccessKeyId\":\"" + Test_AccessKeyId2 + "\"},\"TTL\":0,\"MFASerialNumber\":\"\",\"MFASecret\":\"\"}", http.StatusOK, "{\"Message\":\"Federation user " + Test_Arn + " updated.\",\"HTTPCode\":200,\"ApplicationCode\":0}"},
+		{"PUT", "/" + httphandling.APIVersion + "/federationuser/" + Test_Arn_Stub + "/blah", "{\"Name\":\"" + Test_FedName + "\",\"Arn\":\"" + Test_Arn + "\",\"Credentials\":{\"SecretAccessKey\":\"REDACTED\",\"SessionToken\":\"REDACTED\",\"Expiration\":\"" + Test_Expiration + "\",\"AccessKeyId\":\"" + Test_AccessKeyId2 + "\"},\"TTL\":0,\"MFASerialNumber\":\"\",\"MFASecret\":\"\"}", http.StatusNotFound, "{\"Message\":\"Federation user not found.\",\"HTTPCode\":404,\"ApplicationCode\":101}"},
+		{"PUT", "/" + httphandling.APIVersion + "/federationuser/" + Test_Arn, "{\"Name\":\"" + Test_FedName + "\",\"Arn\":\"" + Test_Arn + "\",\"Credentials\":{\"SecretAccessKey\":\"REDACTED\",\"SessionToken\":\"REDACTED\",\"Expiration\":\"" + Test_Expiration + "\",\"AccessKeyId\":\"" + Test_AccessKeyId2 + "\"},\"TTL\":0,\"MFASerialNumber\":\"\",\"MFASecret\":\"\"}", http.StatusOK, "{\"Message\":\"Federation user " + Test_Arn + " updated.\",\"HTTPCode\":200,\"ApplicationCode\":0}"},
 		{"GET", "/" + httphandling.APIVersion + "/federationuser/" + Test_Arn, "", http.StatusOK, "{\"Arn\":\"" + Test_Arn + "\",\"Credentials\":{\"SecretAccessKey\":\"REDACTED\",\"SessionToken\":\"REDACTED\",\"Expiration\":\"" + Test_Expiration + "\",\"AccessKeyId\":\"" + Test_AccessKeyId2 + "\"},\"TTL\":0,\"MFASerialNumber\":\"\",\"MFASecret\":\"\"}"},
 	}
 	for _, test := range tests {
@@ -128,8 +136,8 @@ func TestFederationUser(t *testing.T) {
 
 func initServer(t *testing.T) (*app, *httptest.Server) {
 	// Start a mock vault process
-	s, addr, vCertPool, test_app_id, test_user_id := vaultmock.RunMockVault(t)
-	vCertFile := testingTLS.WriteCertPoolToFile(t, *vCertPool)
+	s, addr, vCertPool, cert, test_app_id, test_user_id := vaultmock.RunMockVault(t)
+	vCertFile := testingTLS.WriteCertToFile(t, cert)
 
 	// Populate the vault
 	populateVault(t, addr, vCertPool, test_app_id, test_user_id)
@@ -163,7 +171,7 @@ func initServer(t *testing.T) (*app, *httptest.Server) {
 	//ls.Addr().String())
 
 	// Form the configuration JSON text and write to a file
-	completeJson := fmt.Sprintf(TestConfigJSON, "127.0.0.1:9443", certPath, keyPath, auditLog.Name(), appLog.Name(), accessLog.Name(), Test_SecretsPath, addr, vCertFile.Name(), test_app_id, f.Name())
+	completeJson := fmt.Sprintf(TestConfigJSON, "127.0.0.1:9443", certPath, keyPath, auditLog.Name(), appLog.Name(), accessLog.Name(), Test_SecretsPath, addr, vCertFile.Name(), test_app_id, f.Name(), Test_DB_Conn, Test_DB_Creds_Path)
 	testConfigFile, _ := ioutil.TempFile(os.TempDir(), "config")
 	defer os.Remove(testConfigFile.Name())
 	testConfigFile.WriteString(completeJson)
@@ -201,4 +209,11 @@ func populateVault(t *testing.T, addr string, certPool *x509.CertPool, test_app_
 	if err != nil {
 		t.Fatalf("Failed to store AWS credential: %v", err)
 	}
+
+	cl, err := vaultclient.NewClient(&vconf, &vcreds)
+	dbs := map[string]interface{}{
+		"username": "dbusername",
+		"password": "dbpassword",
+	}
+	cl.Write(Test_DB_Creds_Path, dbs)
 }

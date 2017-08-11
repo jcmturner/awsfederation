@@ -1,27 +1,29 @@
 package awsfederation
 
 import (
+	"database/sql"
 	"flag"
+	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/jcmturner/awsfederation/config"
+	"github.com/jcmturner/awsfederation/federationuser"
 	"github.com/jcmturner/awsfederation/httphandling"
 	"log"
 	"net/http"
-	"github.com/jcmturner/awsfederation/federationuser"
-	"fmt"
 	"os"
-	"database/sql"
+	//_ "github.com/jcmturner/mysql"
 	_ "github.com/go-sql-driver/mysql"
+	//TODO uncomment once apprach for Vault testing sorted //_ "github.com/go-sql-driver/mysql"
+	"github.com/jcmturner/awsfederation/database"
 	"github.com/jcmturner/vaultclient"
 	"strings"
-	"github.com/jcmturner/awsfederation/database"
 )
 
 type app struct {
-	Router *mux.Router
-	Config *config.Config
-	FedUserCache *federationuser.FedUserCache
-	DB *sql.DB
+	Router        *mux.Router
+	Config        *config.Config
+	FedUserCache  *federationuser.FedUserCache
+	DB            *sql.DB
 	PreparedStmts *database.StmtMap
 }
 
@@ -36,11 +38,11 @@ func (a *app) initialize(configPath string) {
 	c.ApplicationLogf(c.Summary())
 
 	// Initialise the HTTP router
-	a.Router = httphandling.NewRouter(a.Config)
+	a.Router = httphandling.NewRouter(a.Config, a.PreparedStmts)
 
 	// Set up the database connection
 	dbs := c.Database.ConnectionString
-	vc, err := vaultclient.NewClient(*c.Vault.Config, *c.Vault.Credentials)
+	vc, err := vaultclient.NewClient(c.Vault.Config, c.Vault.Credentials)
 	dbm, err := vc.Read(c.Database.CredentialsVaultPath)
 	if err != nil {
 		c.ApplicationLogf("Failed to load database credentials from the vault: %v", err)
@@ -52,7 +54,7 @@ func (a *app) initialize(configPath string) {
 	if v, ok := dbm["password"]; ok {
 		dbs = strings.Replace(dbs, "${password}", v.(string), -1)
 	}
-	a.DB, err = sql.Open(c.Database.DriverName, dbs)
+	a.DB, err = sql.Open("mysql", dbs)
 	if err != nil {
 		c.ApplicationLogf("Failed to open database: %v\n", err)
 		log.Fatalf("Failed to open database: %v\n", err)

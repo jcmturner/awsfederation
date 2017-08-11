@@ -6,6 +6,7 @@ import (
 	"github.com/jcmturner/gotestingtools/testingTLS"
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"testing"
 )
@@ -40,9 +41,15 @@ const (
 			"UserIDFile": "%s"
 		}
 
+	},
+	"Database": {
+		"ConnectionString": "%s",
+		"CredentialsVaultPath": "%s"
 	}
 }
 `
+	Test_DB_Conn       = "${username}:${password}@tcp(127.0.0.1:3306)/awsfederation"
+	Test_DB_Creds_Path = "/secret/dbcreds/"
 )
 
 func TestLoad(t *testing.T) {
@@ -75,7 +82,7 @@ func TestLoad(t *testing.T) {
 	ls := "127.0.0.1:9443"
 	ep := "https://127.0.0.1:8200"
 
-	completeJson := fmt.Sprintf(TestJSON, ls, certPath, keyPath, auditLog.Name(), appLog.Name(), accessLog.Name(), "/testsecret/", ep, certPath, "0f9ef666-cdd9-4176-8c69-2d456be86ac0", "09f28d61-67c0-4587-82f6-e2df56a1b075", f.Name())
+	completeJson := fmt.Sprintf(TestJSON, ls, certPath, keyPath, auditLog.Name(), appLog.Name(), accessLog.Name(), "/testsecret/", ep, certPath, "0f9ef666-cdd9-4176-8c69-2d456be86ac0", "09f28d61-67c0-4587-82f6-e2df56a1b075", f.Name(), Test_DB_Conn, Test_DB_Creds_Path)
 
 	testConfigFile, _ := ioutil.TempFile(os.TempDir(), "config")
 	defer os.Remove(testConfigFile.Name())
@@ -93,8 +100,11 @@ func TestLoad(t *testing.T) {
 	assert.Equal(t, appLog.Name(), c.Server.Logging.ApplicationFile, "Application log filename not as expected")
 	assert.Equal(t, ep, *c.Vault.Config.ReSTClientConfig.EndPoint, "Endpoint on vault HTTP client not as expected")
 	assert.Equal(t, certPath, *c.Vault.Config.ReSTClientConfig.TrustCACert, "Trust CA cert on vault client not as expected")
+	assert.Equal(t, *certPool, *c.Vault.Config.ReSTClientConfig.HTTPClient.Transport.(*http.Transport).TLSClientConfig.RootCAs, "CA cert for Vault connection not set on client transport")
 	assert.Equal(t, "/testsecret/", c.Vault.Config.SecretsPath, "Secrets path not as expected")
 	assert.Equal(t, f.Name(), c.Vault.Credentials.UserIDFile, "UserID file not as expected")
 	assert.Equal(t, userid, c.Vault.Credentials.UserID, "UserID not as expected")
 	assert.Equal(t, "0f9ef666-cdd9-4176-8c69-2d456be86ac0", c.Vault.Credentials.AppID, "AppID not as expected")
+	assert.Equal(t, Test_DB_Conn, c.Database.ConnectionString, "Database connection string not as expected")
+	assert.Equal(t, Test_DB_Creds_Path, c.Database.CredentialsVaultPath, "Database credentials path not as expected")
 }
