@@ -12,7 +12,9 @@ const (
 		"WHERE roleMapping.id = ?"
 )
 
-func getAssumeRoleStmts() []Statement {
+type assumeRole struct{}
+
+func (a assumeRole) stmts() []Statement {
 	return []Statement{
 		{
 			ID:    StmtKeyAuthzCheck,

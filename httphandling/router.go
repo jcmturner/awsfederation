@@ -12,10 +12,11 @@ const (
 )
 
 type Route struct {
-	Method      string
-	Pattern     string
-	Name        string
-	HandlerFunc http.HandlerFunc
+	Method         string
+	Pattern        string
+	Name           string
+	Authentication bool
+	HandlerFunc    http.HandlerFunc
 }
 
 func NewRouter(c *config.Config, stmtMap *database.StmtMap) *mux.Router {
@@ -30,7 +31,7 @@ func addRoutes(router *mux.Router, routes []Route, c *config.Config) *mux.Router
 		var handler http.Handler
 
 		handler = route.HandlerFunc
-		handler = WrapCommonHandler(handler, c)
+		handler = WrapCommonHandler(handler, route.Authentication, c)
 
 		router.
 			Methods(route.Method).

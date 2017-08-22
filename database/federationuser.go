@@ -7,7 +7,9 @@ const (
 	QueryFedUserDelete   = "DELETE FROM federationUser WHERE arn = ?"
 )
 
-func getFederationUserStmts() []Statement {
+type federationUser struct{}
+
+func (p *federationUser) stmts() []Statement {
 	return []Statement{
 		{
 			ID:    StmtKeyFedUserInsert,

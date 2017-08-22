@@ -5,12 +5,16 @@ import (
 	"fmt"
 )
 
+type StmtMap map[int]*sql.Stmt
+
 type Statement struct {
 	ID    int
 	Query string
 }
 
-type StmtMap map[int]*sql.Stmt
+type stmtProvider interface {
+	stmts() []Statement
+}
 
 func NewStmtMap(db *sql.DB) (*StmtMap, error) {
 	stmtMap := make(StmtMap)
@@ -19,13 +23,13 @@ func NewStmtMap(db *sql.DB) (*StmtMap, error) {
 }
 
 func Statements() []Statement {
-	fs := []func() []Statement{
-		getAssumeRoleStmts,
-		getFederationUserStmts,
+	ps := []stmtProvider{
+		new(assumeRole),
+		new(federationUser),
 	}
 	var s []Statement
-	for _, f := range fs {
-		s = append(s, f()...)
+	for _, p := range ps {
+		s = append(s, p.stmts()...)
 	}
 	return s
 }

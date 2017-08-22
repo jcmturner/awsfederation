@@ -6,6 +6,7 @@ import (
 	"fmt"
 	awssts "github.com/aws/aws-sdk-go/service/sts"
 	"github.com/hashicorp/go-uuid"
+	"github.com/jcmturner/awsfederation/apperrors"
 	"github.com/jcmturner/awsfederation/config"
 	"github.com/jcmturner/awsfederation/database"
 	"github.com/jcmturner/awsfederation/federationuser"
@@ -34,11 +35,16 @@ func auditLog(l config.AuditLogLine, d AuditDetail, c *config.Config) {
 }
 
 func Federate(u goidentity.Identity, id string, stmtMap database.StmtMap, fc *federationuser.FedUserCache, c *config.Config) (o *awssts.AssumeRoleOutput, err error) {
+	eventUUID, err := uuid.GenerateUUID()
+	if err != nil {
+		return
+	}
 	auditLine := config.AuditLogLine{
-		Username:  u.UserName(),
-		UserRealm: u.Domain(),
-		EventType: "AssumeRoleFederation",
-		Time:      time.Now().UTC(),
+		Username:   u.UserName(),
+		UserDomain: u.Domain(),
+		EventType:  "AssumeRoleFederation",
+		Time:       time.Now().UTC(),
+		UUID:       eventUUID,
 	}
 	d := AuditDetail{
 		RoleMappingID:   id,
@@ -50,15 +56,17 @@ func Federate(u goidentity.Identity, id string, stmtMap database.StmtMap, fc *fe
 	var authzed bool
 	authzed, err = Authorize(u, id, stmtMap)
 	if err != nil {
-		d.Comment = fmt.Sprintf("Authorization check failed with error: %v", err)
+		d.Comment = fmt.Sprintf("Authorization check failed due to error: [%v]", err)
+		c.ApplicationLogf("%v Request: %+v Details: %+v", err, auditLine, d)
 		auditLog(auditLine, d, c)
 		return
 	}
 	if authzed {
 		role, fu, duration, policy, roleSessionNameFmt, e := RoleMappingLookup(id, stmtMap)
 		if e != nil {
-			err = fmt.Errorf("Error getting role mapping details: %v", e)
+			err = fmt.Errorf("Error getting role mapping details during federation: [%v]", e)
 			d.Comment = err.Error()
+			c.ApplicationLogf("%v Request: %+v Details: %+v", err, auditLine, d)
 			auditLog(auditLine, d, c)
 			return
 		}
@@ -66,16 +74,18 @@ func Federate(u goidentity.Identity, id string, stmtMap database.StmtMap, fc *fe
 		d.FederationUser = fu
 		o, err = sts.Federate(c, fc, fu, role, roleSessionNamef(roleSessionNameFmt, u), policy, duration)
 		if err != nil {
-			err = fmt.Errorf("Error performing federation: %v", err)
+			err = fmt.Errorf("Error performing federation: [%v]", err)
 			d.RoleSessionName = o.AssumedRoleUser.String()
 			d.SessionDuration = time.Duration(duration)
 			d.Comment = err.Error()
+			c.ApplicationLogf("%v Request: %+v Details: %+v", err, auditLine, d)
 			auditLog(auditLine, d, c)
 			return
 		}
 		return
 	} else {
-		d.Comment = "User not authorized"
+		d.Comment = "Access denied, user not authorized"
+		err = apperrors.ErrUnauthorized{}.Errorf(d.Comment)
 		auditLog(auditLine, d, c)
 		return
 	}

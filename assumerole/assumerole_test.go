@@ -103,3 +103,12 @@ func TestRoleMappingLookup(t *testing.T) {
 	assert.Equal(t, testPolicy, policyStr, "Policy override returned from db query not as expected")
 	assert.Equal(t, testRoleSessFmt, roleSessionNameFmt, "RoleSessionFormat returned from db query not as expected")
 }
+
+func TestRoleSessionNamef(t *testing.T) {
+	testFmt := "${displayname}:${domain}/${username}-${human}"
+	u := goidentity.NewUser("testUserName")
+	u.SetDisplayName("testDisplay")
+	u.SetDomain("mydomain")
+	u.SetHuman(true)
+	assert.Equal(t, "testDisplay:mydomain/testUserName-true", roleSessionNamef(testFmt, &u), "Role session nam eofmrating not correct")
+}

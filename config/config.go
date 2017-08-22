@@ -2,27 +2,36 @@ package config
 
 import (
 	"crypto/tls"
+	"crypto/x509"
+	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
+	krb5config "github.com/jcmturner/gokrb5/config"
+	"github.com/jcmturner/gokrb5/keytab"
 	"github.com/jcmturner/restclient"
 	"github.com/jcmturner/vaultclient"
+	"gopkg.in/ldap.v2"
 	"io/ioutil"
 	"log"
 	"net"
 	"os"
+	"strings"
 	"time"
 )
 
 type Config struct {
-	Server   Server   `json:"Server"`
-	Vault    Vault    `json:"Vault"`
-	Database Database `json:"Database"`
+	Server         Server         `json:"Server"`
+	Vault          Vault          `json:"Vault"`
+	Database       Database       `json:"Database"`
+	Authentication Authentication `json:"Authenticaiton"`
 }
 
 type Vault struct {
 	Config      *vaultclient.Config      `json:"Config"`
 	Credentials *vaultclient.Credentials `json:"Credentials"`
+	Client      *vaultclient.Client
 }
 
 type Server struct {
@@ -34,6 +43,55 @@ type Server struct {
 type Database struct {
 	ConnectionString     string `json:"ConnectionString"`
 	CredentialsVaultPath string `json:"CredentialsVaultPath"`
+}
+
+type Authentication struct {
+	Kerberos Kerberos  `json:"Kerberos"`
+	Basic    BasicAuth `json:"Basic"`
+	JWT      JWT       `json:"JWT"`
+}
+
+type Kerberos struct {
+	Enabled         bool   `json:"Enabled"`
+	KeytabVaultPath string `json:"KeytabVaultPath"`
+	Keytab          *keytab.Keytab
+	ServiceAccount  string `json:"ServiceAccount"`
+}
+
+type BasicAuth struct {
+	Enabled  bool      `json:"Enabled"`
+	Realm    string    `json:"Realm"`
+	Protocol string    `json:"Protocol"` // Kerberos or LDAP
+	Kerberos KRB5Basic `json:"Kerberos"`
+	LDAP     LDAPBasic `json:"LDAP"`
+}
+
+type LDAPBasic struct {
+	EndPoint                  string `json:"EndPoint"`
+	BaseDN                    string `json:"BaseDN"`
+	UsernameAttribute         string `json:"UsernameAttribute"` // "cn" "sAMAccountName"
+	UserObjectClass           string `json:"UserObjectClass"`
+	DisplayNameAttribute      string `json:"DisplayNameAttribute"`
+	MembershipAttribute       string `json:"MembershipAttribute"`
+	BindUserDN                string `json:"BindUserDN"`
+	BindUserPasswordVaultPath string `json:"BindUserPasswordVaultPath"`
+	BindUserPassword          string
+	TLSEnabled                bool   `json:"TLSEnabled"`
+	TrustedCAPath             string `json:"TrustedCAPath"`
+	LDAPConn                  *ldap.Conn
+}
+
+type KRB5Basic struct {
+	KRB5ConfPath    string `json:"KRB5ConfPath"`
+	Conf            *krb5config.Config
+	KeytabVaultPath string `json:"KeytabVaultPath"`
+	Keytab          *keytab.Keytab
+	ServiceAccount  string `json:"ServiceAccount"`
+	SPN             string `json:"SPN"`
+}
+
+type JWT struct {
+	Enabled bool `json:"Enabled"`
 }
 
 type TLS struct {
@@ -52,11 +110,13 @@ type Loggers struct {
 }
 
 type AuditLogLine struct {
-	Username  string    `json:"Username"`
-	UserRealm string    `json:"UserRealm"`
-	Time      time.Time `json:"Time"`
-	EventType string    `json:"EventType"`
-	Detail    string    `json:"Detail"`
+	Username      string    `json:"Username"`
+	UserDomain    string    `json:"UserDomain"`
+	UserSessionID string    `json:"UserSessionID"`
+	Time          time.Time `json:"Time"`
+	EventType     string    `json:"EventType"`
+	UUID          string    `json:"EventUUID"`
+	Detail        string    `json:"Detail"`
 }
 
 func Load(cfgPath string) (*Config, error) {
@@ -67,11 +127,12 @@ func Load(cfgPath string) (*Config, error) {
 	return Parse(j)
 }
 
-func Parse(b []byte) (*Config, error) {
-	c := NewConfig()
-	err := json.Unmarshal(b, &c)
+func Parse(b []byte) (c *Config, err error) {
+	c = NewConfig()
+	err = json.Unmarshal(b, &c)
 	if err != nil {
-		return &Config{}, fmt.Errorf("Configuration file could not be parsed: %v", err)
+		err = fmt.Errorf("Configuration file could not be parsed: %v", err)
+		return
 	}
 	c.SetApplicationLogFile(c.Server.Logging.ApplicationFile)
 	c.SetAuditLogFile(c.Server.Logging.AuditFile)
@@ -79,10 +140,61 @@ func Parse(b []byte) (*Config, error) {
 	c.Vault.Config.ReSTClientConfig.WithCAFilePath(*c.Vault.Config.ReSTClientConfig.TrustCACert)
 	err = c.Vault.Credentials.ReadUserID()
 	if err != nil {
+		err = fmt.Errorf("error configuring vault client: %v", err)
 		c.ApplicationLogf(err.Error())
-		return &Config{}, fmt.Errorf("Error configuring vault client: %v", err)
+		return
 	}
-	return c, nil
+	vc, err := vaultclient.NewClient(c.Vault.Config, c.Vault.Credentials)
+	c.Vault.Client = &vc
+	if c.Authentication.Kerberos.Enabled {
+		if c.Authentication.Kerberos.KeytabVaultPath == "" {
+			err = errors.New("kerberos authentication enabled but no path to keytab in vault defined")
+		}
+		kt, err := loadKeytabFromVault(c.Authentication.Kerberos.KeytabVaultPath, c.Vault.Client)
+		if err != nil {
+			err = errors.New("error loading keytab for kerberos authentication from vault: %v")
+			c.ApplicationLogf(err.Error())
+			return
+		}
+		c.Authentication.Kerberos.Keytab = &kt
+	}
+	if c.Authentication.Basic.Enabled {
+		switch strings.ToLower(c.Authentication.Basic.Protocol) {
+		case "ldap":
+			c.Authentication.Basic.LDAP.BindUserPassword, err = loadLDAPBindPasswordFromVault(c.Authentication.Basic.LDAP.BindUserPasswordVaultPath, c.Vault.Client)
+			if err != nil {
+				err = fmt.Errorf("error loading LDAP bind password from vault: %v", err)
+				c.ApplicationLogf(err.Error())
+				return
+			}
+			lc, err := ldapConn(c.Authentication.Basic.LDAP)
+			if err != nil {
+				err = fmt.Errorf("error getting LDAP connection: %v", err)
+				c.ApplicationLogf(err.Error())
+				return
+			}
+			c.Authentication.Basic.LDAP.LDAPConn = lc
+		case "kerberos":
+			c.Authentication.Basic.Kerberos.Conf, err = krb5config.Load(c.Authentication.Basic.Kerberos.KRB5ConfPath)
+			if err != nil {
+				err = fmt.Errorf("Invalid Kerberos configuration. Basic authentication disabled: %v", err)
+				c.ApplicationLogf(err.Error())
+				return
+			}
+			kt, err := loadKeytabFromVault(c.Authentication.Basic.Kerberos.KeytabVaultPath, c.Vault)
+			if err != nil {
+				err = errors.New("error loading keytab for kerberos basic authentication from vault: %v")
+				c.ApplicationLogf(err.Error())
+				return
+			}
+			c.Authentication.Basic.Kerberos.Keytab = &kt
+		default:
+			err = fmt.Errorf("Invalid protocol (%v) for basic authentication. Basic authentication disabled.", c.Authentication.Basic.Protocol)
+			c.ApplicationLogf(err.Error())
+			return
+		}
+	}
+	return
 }
 
 func NewConfig() *Config {
@@ -269,4 +381,66 @@ func isValidPEMFile(p string) error {
 		return fmt.Errorf("Not valid PEM format: Rest: %v Type: %v", len(rest), block.Type)
 	}
 	return nil
+}
+
+func loadKeytabFromVault(p string, vc *vaultclient.Client) (kt keytab.Keytab, err error) {
+	m, err := vc.Read(p)
+	if err != nil {
+		return
+	}
+	if khex, ok := m["keytab"]; ok {
+		kb, err := hex.DecodeString(khex)
+		if err != nil {
+			return
+		}
+		kt, err = keytab.Parse(kb)
+		if err != nil {
+			return
+		}
+		return
+	}
+	err = errors.New("Keytab not found in vault")
+	return
+}
+
+func ldapConn(l LDAPBasic) (c *ldap.Conn, err error) {
+	if l.EndPoint == "" {
+		err = errors.New("LDAP endpoint not defined")
+	}
+	if l.TLSEnabled {
+		if l.TrustedCAPath == "" {
+			err = errors.New("Trusted CA for LDAPS connection not defined")
+			return
+		}
+		cp := x509.NewCertPool()
+		// Load our trusted certificate path
+		pemData, err := ioutil.ReadFile(l.TrustedCAPath)
+		if err != nil {
+			err = fmt.Errorf("CA certificate for LDAP could not be read from file: %v", err)
+			return
+		}
+		ok := cp.AppendCertsFromPEM(pemData)
+		if !ok {
+			err = fmt.Errorf("CA certificate for LDAP could not be loaded from file, is it PEM format? %v", err)
+			return
+		}
+		tlsConfig := &tls.Config{RootCAs: cp}
+		c, err = ldap.DialTLS("tcp", l.EndPoint, tlsConfig)
+		return
+	}
+	c, err = ldap.Dial("tcp", l.EndPoint)
+	return
+}
+
+func loadLDAPBindPasswordFromVault(p string, vc *vaultclient.Client) (passwd string, err error) {
+	m, err := vc.Read(p)
+	if err != nil {
+		return
+	}
+	if pswd, ok := m["password"]; ok {
+		passwd = pswd.(string)
+		return
+	}
+	err = errors.New("LDAP bind password not found in vault")
+	return
 }

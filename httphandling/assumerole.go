@@ -2,41 +2,51 @@ package httphandling
 
 import (
 	"fmt"
+	"github.com/gorilla/mux"
 	"github.com/jcmturner/awsfederation/appcode"
+	"github.com/jcmturner/awsfederation/apperrors"
+	"github.com/jcmturner/awsfederation/assumerole"
 	"github.com/jcmturner/awsfederation/config"
+	"github.com/jcmturner/awsfederation/database"
 	"github.com/jcmturner/awsfederation/federationuser"
-	"github.com/jcmturner/vaultclient"
 	"net/http"
 )
 
-func getAssumeRoleFunc(c *config.Config) http.HandlerFunc {
+const (
+	MuxVarRoleUUID = "roleUUID"
+)
+
+func getAssumeRoleFunc(c *config.Config, stmtMap *database.StmtMap, fc *federationuser.FedUserCache) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		a := requestToARN(r)
+		roleID := requestToRoleUUID(r)
 
-		// TODO authorization check that user should have access to this role. Authorization check should also get the duration and policy authorized for this user. If the user if authorised by more than one
-		// TODO resolve which federation user to use for this
-
-		u, err := federationuser.LoadFederationUser(c, a)
+		o, err := assumerole.Federate(u, roleID, *stmtMap, fc, c)
 		if err != nil {
-			if _, is404 := err.(vaultclient.ErrSecretNotFound); is404 {
-				respondGeneric(w, http.StatusNotFound, appcode.FEDERATIONUSER_UNKNOWN, "Federation user not found.")
+			if e, NotAuthz := err.(apperrors.ErrUnauthorized); NotAuthz {
+				respondGeneric(w, http.StatusUnauthorized, e.AppCode, e.Error())
 				return
 			}
-			respondGeneric(w, http.StatusInternalServerError, appcode.FEDERATIONUSER_ERROR, err.Error())
+			respondGeneric(w, http.StatusInternalServerError, appcode.AssumeRoleError, err.Error())
 			return
 		}
-		respondWithJSON(w, http.StatusOK, u)
+		respondWithJSON(w, http.StatusOK, o)
 		return
 	})
 }
 
-func getAssumeRoleRoutes(c *config.Config) []Route {
+func getAssumeRoleRoutes(c *config.Config, stmtMap *database.StmtMap, fc *federationuser.FedUserCache) []Route {
 	return []Route{
 		{
-			Name:        "AssumeRoleGet",
-			Method:      "GET",
-			Pattern:     fmt.Sprintf("/"+APIVersion+"/assumerole/"+federationuser.FedUserARNFormat, "{"+MuxVarAccountID+":[0-9]{12}}", "{"+MuxVarUsername+"}"),
-			HandlerFunc: getFederationUserFunc(c),
+			Name:           "AssumeRoleGet",
+			Method:         "GET",
+			Pattern:        fmt.Sprintf(`/%s/assumerole/{%s}:\w{8}-\w{4}-\w{4}-\w{4}-\w{12}`, APIVersion, MuxVarRoleUUID),
+			HandlerFunc:    getAssumeRoleFunc(c, stmtMap, fc),
+			Authentication: true,
 		},
 	}
+}
+
+func requestToRoleUUID(r *http.Request) string {
+	vars := mux.Vars(r)
+	return vars[MuxVarRoleUUID]
 }
