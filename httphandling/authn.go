@@ -16,10 +16,6 @@ import (
 	"time"
 )
 
-const (
-	CTXKey_Authn = "goidentity"
-)
-
 func AuthnHandler(inner http.Handler, c *config.Config) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		s := strings.SplitN(r.Header.Get("Authorization"), " ", 2)
@@ -112,7 +108,7 @@ func AuthnHandler(inner http.Handler, c *config.Config) http.Handler {
 		auditLine.UserSessionID = id.SessionID()
 		auditLog(auditLine, "Client credentials valid", r, c)
 		ctx := r.Context()
-		ctx = context.WithValue(ctx, CTXKey_Authn, id)
+		ctx = context.WithValue(ctx, goidentity.CTXKey, id)
 		r.WithContext(ctx)
 		inner.ServeHTTP(w, r)
 	})
@@ -209,7 +205,7 @@ func ParseBasicHeaderValue(s string) (domain, username, password string, err err
 }
 
 func GetIdentity(ctx context.Context) (id goidentity.Identity, err error) {
-	if u, ok := ctx.Value(CTXKey_Authn).(goidentity.Identity); ok {
+	if u, ok := ctx.Value(goidentity.CTXKey).(goidentity.Identity); ok {
 		id = u
 		return
 	} else {
