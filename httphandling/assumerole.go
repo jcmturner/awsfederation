@@ -19,7 +19,11 @@ const (
 func getAssumeRoleFunc(c *config.Config, stmtMap *database.StmtMap, fc *federationuser.FedUserCache) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		roleID := requestToRoleUUID(r)
-
+		u, err := GetIdentity(r.Context())
+		if err != nil {
+			respondUnauthorized(w, c)
+			return
+		}
 		o, err := assumerole.Federate(u, roleID, *stmtMap, fc, c)
 		if err != nil {
 			if e, NotAuthz := err.(apperrors.ErrUnauthorized); NotAuthz {

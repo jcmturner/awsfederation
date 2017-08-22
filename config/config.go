@@ -150,7 +150,8 @@ func Parse(b []byte) (c *Config, err error) {
 		if c.Authentication.Kerberos.KeytabVaultPath == "" {
 			err = errors.New("kerberos authentication enabled but no path to keytab in vault defined")
 		}
-		kt, err := loadKeytabFromVault(c.Authentication.Kerberos.KeytabVaultPath, c.Vault.Client)
+		var kt keytab.Keytab
+		kt, err = loadKeytabFromVault(c.Authentication.Kerberos.KeytabVaultPath, c.Vault.Client)
 		if err != nil {
 			err = errors.New("error loading keytab for kerberos authentication from vault: %v")
 			c.ApplicationLogf(err.Error())
@@ -167,7 +168,8 @@ func Parse(b []byte) (c *Config, err error) {
 				c.ApplicationLogf(err.Error())
 				return
 			}
-			lc, err := ldapConn(c.Authentication.Basic.LDAP)
+			var lc *ldap.Conn
+			lc, err = ldapConn(c.Authentication.Basic.LDAP)
 			if err != nil {
 				err = fmt.Errorf("error getting LDAP connection: %v", err)
 				c.ApplicationLogf(err.Error())
@@ -181,7 +183,8 @@ func Parse(b []byte) (c *Config, err error) {
 				c.ApplicationLogf(err.Error())
 				return
 			}
-			kt, err := loadKeytabFromVault(c.Authentication.Basic.Kerberos.KeytabVaultPath, c.Vault)
+			var kt keytab.Keytab
+			kt, err = loadKeytabFromVault(c.Authentication.Basic.Kerberos.KeytabVaultPath, c.Vault.Client)
 			if err != nil {
 				err = errors.New("error loading keytab for kerberos basic authentication from vault: %v")
 				c.ApplicationLogf(err.Error())
@@ -384,12 +387,14 @@ func isValidPEMFile(p string) error {
 }
 
 func loadKeytabFromVault(p string, vc *vaultclient.Client) (kt keytab.Keytab, err error) {
-	m, err := vc.Read(p)
+	m, e := vc.Read(p)
 	if err != nil {
+		err = e
 		return
 	}
 	if khex, ok := m["keytab"]; ok {
-		kb, err := hex.DecodeString(khex)
+		var kb []byte
+		kb, err = hex.DecodeString(khex.(string))
 		if err != nil {
 			return
 		}
@@ -414,9 +419,9 @@ func ldapConn(l LDAPBasic) (c *ldap.Conn, err error) {
 		}
 		cp := x509.NewCertPool()
 		// Load our trusted certificate path
-		pemData, err := ioutil.ReadFile(l.TrustedCAPath)
+		pemData, e := ioutil.ReadFile(l.TrustedCAPath)
 		if err != nil {
-			err = fmt.Errorf("CA certificate for LDAP could not be read from file: %v", err)
+			err = fmt.Errorf("CA certificate for LDAP could not be read from file: %v", e)
 			return
 		}
 		ok := cp.AppendCertsFromPEM(pemData)

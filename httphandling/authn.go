@@ -3,6 +3,7 @@ package httphandling
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"github.com/hashicorp/go-uuid"
 	"github.com/jcmturner/awsfederation/appcode"
@@ -177,7 +178,7 @@ func (a LDAPBasicAuthenticator) Authenticate() (i goidentity.Identity, ok bool, 
 	return
 }
 
-func (a LDAPBasicAuthenticator) Mechansim() string {
+func (a LDAPBasicAuthenticator) Mechanism() string {
 	return "LDAP Basic"
 }
 
@@ -193,11 +194,11 @@ func ParseBasicHeaderValue(s string) (domain, username, password string, err err
 	// <Username> - no domain specified
 	// <Domain>\<Username>
 	// <Username>@<Domain>
-	if strings.ContainsRune(vc[0], `\`) {
+	if strings.Contains(vc[0], `\`) {
 		u := strings.SplitN(vc[0], `\`, 2)
 		domain = u[0]
 		username = u[1]
-	} else if strings.ContainsRune(vc[0], `@`) {
+	} else if strings.Contains(vc[0], `@`) {
 		u := strings.SplitN(vc[0], `\`, 2)
 		domain = u[1]
 		username = u[0]
@@ -205,4 +206,14 @@ func ParseBasicHeaderValue(s string) (domain, username, password string, err err
 		username = vc[0]
 	}
 	return
+}
+
+func GetIdentity(ctx context.Context) (id goidentity.Identity, err error) {
+	if u, ok := ctx.Value(CTXKey_Authn).(goidentity.Identity); ok {
+		id = u
+		return
+	} else {
+		err = errors.New("No identity found in context")
+		return
+	}
 }
