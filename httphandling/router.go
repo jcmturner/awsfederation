@@ -4,6 +4,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/jcmturner/awsfederation/config"
 	"github.com/jcmturner/awsfederation/database"
+	"github.com/jcmturner/awsfederation/federationuser"
 	"net/http"
 )
 
@@ -19,9 +20,10 @@ type Route struct {
 	HandlerFunc    http.HandlerFunc
 }
 
-func NewRouter(c *config.Config, stmtMap *database.StmtMap) *mux.Router {
+func NewRouter(c *config.Config, stmtMap *database.StmtMap, fc *federationuser.FedUserCache) *mux.Router {
 	router := mux.NewRouter().StrictSlash(true)
 	addRoutes(router, getFederationUserRoutes(c, stmtMap), c)
+	addRoutes(router, getAssumeRoleRoutes(c, stmtMap, fc), c)
 
 	return router
 }

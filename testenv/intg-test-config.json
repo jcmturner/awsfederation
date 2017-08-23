@@ -1,0 +1,34 @@
+{
+  "Server": {
+    "Socket": "%s",
+    "TLS": {
+      "Enabled": true,
+      "CertificateFile": "%s",
+      "KeyFile": "%s"
+    },
+    "Logging": {
+      "Audit": "%s",
+      "Application": "%s",
+      "Access": "%s"
+    }
+  },
+  "Vault": {
+    "Config": {
+      "SecretsPath": "%s",
+      "VaultConnection": {
+        "EndPoint": "%s",
+        "TrustCACert": "%s"
+      }
+    },
+    "Credentials": {
+      "AppID": "%s",
+      "UserID": "%s",
+      "UserIDFile": "%s"
+    }
+
+  },
+  "Database": {
+    "ConnectionString": "%s",
+    "CredentialsVaultPath": "%s"
+  }
+}

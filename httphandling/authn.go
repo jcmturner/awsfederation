@@ -41,41 +41,41 @@ func AuthnHandler(inner http.Handler, c *config.Config) http.Handler {
 		var authenticator goidentity.Authenticator
 		switch s[0] {
 		case "Negotiate":
-			if !c.Authentication.Kerberos.Enabled {
+			if !c.Server.Authentication.Kerberos.Enabled {
 				auditLine.EventType = "Failed Authentication"
 				auditLog(auditLine, "Negotiate mechanism attempted by client but disabled in server configuration", r, c)
 				respondUnauthorized(w, c)
 				return
 			}
 			a := new(service.SPNEGOAuthenticator)
-			a.Keytab = c.Authentication.Kerberos.Keytab
-			a.ServiceAccount = c.Authentication.Kerberos.ServiceAccount
+			a.Keytab = c.Server.Authentication.Kerberos.Keytab
+			a.ServiceAccount = c.Server.Authentication.Kerberos.ServiceAccount
 			a.ClientAddr = r.RemoteAddr
 			a.SPNEGOHeaderValue = s[1]
 			authenticator = a
 		case "Basic":
-			if !c.Authentication.Basic.Enabled {
+			if !c.Server.Authentication.Basic.Enabled {
 				auditLine.EventType = "Failed Authentication"
 				auditLog(auditLine, "Basic mechanism attempted by client but disabled in server configuration", r, c)
 				respondUnauthorized(w, c)
 				return
 			}
-			switch strings.ToLower(c.Authentication.Basic.Protocol) {
+			switch strings.ToLower(c.Server.Authentication.Basic.Protocol) {
 			case "ldap":
 				a := new(LDAPBasicAuthenticator)
 				a.BasicHeaderValue = s[1]
-				a.LDAPConfig = c.Authentication.Basic.LDAP
+				a.LDAPConfig = c.Server.Authentication.Basic.LDAP
 				authenticator = a
 			case "kerberos":
 				a := new(service.KRB5BasicAuthenticator)
 				a.BasicHeaderValue = s[1]
-				a.ServiceAccount = c.Authentication.Basic.Kerberos.ServiceAccount
-				a.SPN = c.Authentication.Basic.Kerberos.SPN
-				a.Config = c.Authentication.Basic.Kerberos.Conf
-				a.ServiceKeytab = c.Authentication.Basic.Kerberos.Keytab
+				a.ServiceAccount = c.Server.Authentication.Basic.Kerberos.ServiceAccount
+				a.SPN = c.Server.Authentication.Basic.Kerberos.SPN
+				a.Config = c.Server.Authentication.Basic.Kerberos.Conf
+				a.ServiceKeytab = c.Server.Authentication.Basic.Kerberos.Keytab
 				authenticator = a
 			default:
-				c.ApplicationLogf("Configuration for basic authentication not valid. Protocol specified as: %v", c.Authentication.Basic.Protocol)
+				c.ApplicationLogf("Configuration for basic authentication not valid. Protocol specified as: %v", c.Server.Authentication.Basic.Protocol)
 				respondGeneric(w, http.StatusInternalServerError, appcode.ServerConfigurationError, "Basic authentication not availbale")
 				return
 			}

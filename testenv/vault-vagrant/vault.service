@@ -1,0 +1,9 @@
+[Unit]
+Description=vault
+Requires=network.target
+
+[Service]
+ExecStart=/home/vagrant/vault server -config=/vagrant/conf/vault.hcl
+
+[Install]
+WantedBy=multi-user.target

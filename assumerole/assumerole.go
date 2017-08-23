@@ -40,11 +40,12 @@ func Federate(u goidentity.Identity, id string, stmtMap database.StmtMap, fc *fe
 		return
 	}
 	auditLine := config.AuditLogLine{
-		Username:   u.UserName(),
-		UserDomain: u.Domain(),
-		EventType:  "AssumeRoleFederation",
-		Time:       time.Now().UTC(),
-		UUID:       eventUUID,
+		Username:      u.UserName(),
+		UserDomain:    u.Domain(),
+		UserSessionID: u.SessionID(),
+		EventType:     "AssumeRoleFederation",
+		Time:          time.Now().UTC(),
+		UUID:          eventUUID,
 	}
 	d := AuditDetail{
 		RoleMappingID:   id,

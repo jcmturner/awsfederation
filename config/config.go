@@ -21,11 +21,79 @@ import (
 	"time"
 )
 
+const (
+	TemplateJSON = `
+{
+	"Server": {
+		"Socket": "%s",
+		"TLS": {
+			"Enabled": %t,
+			"CertificateFile": "%s",
+			"KeyFile": "%s"
+		},
+		"Authentication": {
+			"Kerberos": {
+				"Enabled": %t,
+				"KeytabVaultPath": "%s",
+				"ServiceAccount": "%s"
+			},
+			"Basic": {
+				"Enabled": %t,
+				"Realm": "%s",
+				"Protocol": "%s",
+				"Kerberos": {
+					"KRB5ConfPath": "%s",
+					"KeytabVaultPath": "%s",
+					"ServiceAccount": "%s",
+					"SPN": "%s"
+				},
+				"LDAP": {
+					"EndPoint": "%s",
+					"BaseDN": "%s",
+					"UsernameAttribute": "%s",
+					"UserObjectClass": "%s",
+					"DisplayNameAttribute": "%s",
+					"MembershipAttribute": "%s",
+					"BindUserDN": "%s",
+					"BindUserPasswordVaultPath": "%s",
+					"TLSEnabled": %t,
+					"TrustedCAPath": "%s"
+				}
+			}
+		},
+		"Logging": {
+			"Audit": "%s",
+			"Application": "%s",
+			"Access": "%s"
+		}
+	},
+	"Vault": {
+		"Config": {
+			"SecretsRoot": "%s",
+			"VaultConnection": {
+				"EndPoint": "%s",
+				"TrustCACert": "%s"
+			}
+		},
+		"Credentials": {
+			"AppID": "%s",
+			"UserID": "%s",
+			"UserIDFile": "%s"
+		}
+
+	},
+	"Database": {
+		"ConnectionString": "%s",
+		"CredentialsVaultPath": "%s"
+	}
+}
+`
+)
+
 type Config struct {
-	Server         Server         `json:"Server"`
-	Vault          Vault          `json:"Vault"`
-	Database       Database       `json:"Database"`
-	Authentication Authentication `json:"Authenticaiton"`
+	Server   Server   `json:"Server"`
+	Vault    Vault    `json:"Vault"`
+	Database Database `json:"Database"`
 }
 
 type Vault struct {
@@ -35,9 +103,10 @@ type Vault struct {
 }
 
 type Server struct {
-	Socket  string   `json:"Socket"`
-	TLS     TLS      `json:"TLS"`
-	Logging *Loggers `json:"Logging"`
+	Socket         string         `json:"Socket"`
+	TLS            TLS            `json:"TLS"`
+	Authentication Authentication `json:"Authentication"`
+	Logging        *Loggers       `json:"Logging"`
 }
 
 type Database struct {
@@ -122,7 +191,7 @@ type AuditLogLine struct {
 func Load(cfgPath string) (*Config, error) {
 	j, err := ioutil.ReadFile(cfgPath)
 	if err != nil {
-		return &Config{}, fmt.Errorf("Could not load configuration: %v", err)
+		return &Config{}, fmt.Errorf("could not load configuration: %v", err)
 	}
 	return Parse(j)
 }
@@ -131,7 +200,7 @@ func Parse(b []byte) (c *Config, err error) {
 	c = NewConfig()
 	err = json.Unmarshal(b, &c)
 	if err != nil {
-		err = fmt.Errorf("Configuration file could not be parsed: %v", err)
+		err = fmt.Errorf("configuration file could not be parsed: %v", err)
 		return
 	}
 	c.SetApplicationLogFile(c.Server.Logging.ApplicationFile)
@@ -146,53 +215,53 @@ func Parse(b []byte) (c *Config, err error) {
 	}
 	vc, err := vaultclient.NewClient(c.Vault.Config, c.Vault.Credentials)
 	c.Vault.Client = &vc
-	if c.Authentication.Kerberos.Enabled {
-		if c.Authentication.Kerberos.KeytabVaultPath == "" {
+	if c.Server.Authentication.Kerberos.Enabled {
+		if c.Server.Authentication.Kerberos.KeytabVaultPath == "" {
 			err = errors.New("kerberos authentication enabled but no path to keytab in vault defined")
 		}
 		var kt keytab.Keytab
-		kt, err = loadKeytabFromVault(c.Authentication.Kerberos.KeytabVaultPath, c.Vault.Client)
+		kt, err = loadKeytabFromVault(c.Vault.Config.SecretsPath+c.Server.Authentication.Kerberos.KeytabVaultPath, c.Vault.Client)
 		if err != nil {
-			err = errors.New("error loading keytab for kerberos authentication from vault: %v")
+			err = fmt.Errorf("error loading keytab for kerberos authentication from vault: %v", err)
 			c.ApplicationLogf(err.Error())
 			return
 		}
-		c.Authentication.Kerberos.Keytab = &kt
+		c.Server.Authentication.Kerberos.Keytab = &kt
 	}
-	if c.Authentication.Basic.Enabled {
-		switch strings.ToLower(c.Authentication.Basic.Protocol) {
+	if c.Server.Authentication.Basic.Enabled {
+		switch strings.ToLower(c.Server.Authentication.Basic.Protocol) {
 		case "ldap":
-			c.Authentication.Basic.LDAP.BindUserPassword, err = loadLDAPBindPasswordFromVault(c.Authentication.Basic.LDAP.BindUserPasswordVaultPath, c.Vault.Client)
+			c.Server.Authentication.Basic.LDAP.BindUserPassword, err = loadLDAPBindPasswordFromVault(c.Server.Authentication.Basic.LDAP.BindUserPasswordVaultPath, c.Vault.Client)
 			if err != nil {
 				err = fmt.Errorf("error loading LDAP bind password from vault: %v", err)
 				c.ApplicationLogf(err.Error())
 				return
 			}
 			var lc *ldap.Conn
-			lc, err = ldapConn(c.Authentication.Basic.LDAP)
+			lc, err = ldapConn(c.Server.Authentication.Basic.LDAP)
 			if err != nil {
 				err = fmt.Errorf("error getting LDAP connection: %v", err)
 				c.ApplicationLogf(err.Error())
 				return
 			}
-			c.Authentication.Basic.LDAP.LDAPConn = lc
+			c.Server.Authentication.Basic.LDAP.LDAPConn = lc
 		case "kerberos":
-			c.Authentication.Basic.Kerberos.Conf, err = krb5config.Load(c.Authentication.Basic.Kerberos.KRB5ConfPath)
+			c.Server.Authentication.Basic.Kerberos.Conf, err = krb5config.Load(c.Server.Authentication.Basic.Kerberos.KRB5ConfPath)
 			if err != nil {
-				err = fmt.Errorf("Invalid Kerberos configuration. Basic authentication disabled: %v", err)
+				err = fmt.Errorf("invalid kerberos basic authentication configuration: %v", err)
 				c.ApplicationLogf(err.Error())
 				return
 			}
 			var kt keytab.Keytab
-			kt, err = loadKeytabFromVault(c.Authentication.Basic.Kerberos.KeytabVaultPath, c.Vault.Client)
+			kt, err = loadKeytabFromVault(c.Vault.Config.SecretsPath+c.Server.Authentication.Basic.Kerberos.KeytabVaultPath, c.Vault.Client)
 			if err != nil {
 				err = errors.New("error loading keytab for kerberos basic authentication from vault: %v")
 				c.ApplicationLogf(err.Error())
 				return
 			}
-			c.Authentication.Basic.Kerberos.Keytab = &kt
+			c.Server.Authentication.Basic.Kerberos.Keytab = &kt
 		default:
-			err = fmt.Errorf("Invalid protocol (%v) for basic authentication. Basic authentication disabled.", c.Authentication.Basic.Protocol)
+			err = fmt.Errorf("invalid protocol (%v) for basic authentication", c.Server.Authentication.Basic.Protocol)
 			c.ApplicationLogf(err.Error())
 			return
 		}
@@ -224,7 +293,7 @@ func NewConfig() *Config {
 
 func (c *Config) SetSocket(s string) *Config {
 	if _, err := net.ResolveTCPAddr("tcp", s); err != nil {
-		c.ApplicationLogf("Invalid listener socket defined for server: %v\n", err)
+		c.ApplicationLogf("invalid listener socket defined for server: %v\n", err)
 		return c
 	}
 	c.Server.Socket = s
@@ -250,7 +319,7 @@ func (c *Config) SetAuditLogFile(p string) *Config {
 	}
 	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0640)
 	if err != nil {
-		c.ApplicationLogf("Could not open audit log file: %v\n", err)
+		c.ApplicationLogf("could not open audit log file: %v\n", err)
 	}
 	c.Server.Logging.AuditFile = p
 	enc := json.NewEncoder(f)
@@ -269,7 +338,7 @@ func (c *Config) SetApplicationLogFile(p string) *Config {
 	}
 	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
-		c.ApplicationLogf("Could not open application log file: %v\n", err)
+		c.ApplicationLogf("could not open application log file: %v\n", err)
 	}
 	l := log.New(f, "Application Log: ", log.Ldate|log.Ltime|log.Lshortfile)
 	c.Server.Logging.ApplicationFile = p
@@ -283,7 +352,7 @@ func (c *Config) SetAccessLogFile(p string) *Config {
 	}
 	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0640)
 	if err != nil {
-		c.ApplicationLogf("Could not open access log file: %v\n", err)
+		c.ApplicationLogf("could not open access log file: %v\n", err)
 	}
 	c.Server.Logging.AccessLog = p
 	enc := json.NewEncoder(f)
@@ -317,7 +386,7 @@ func (c Config) AccessLog(v interface{}) {
 	if c.Server.Logging.AuditEncoder != nil {
 		err := c.Server.Logging.AccessEncoder.Encode(v)
 		if err != nil {
-			c.ApplicationLogf("Could not log access event: %+v - Error: %v\n", err)
+			c.ApplicationLogf("could not log access event: %+v - Error: %v\n", err)
 		}
 	}
 }
@@ -326,7 +395,7 @@ func (c Config) AuditLog(v interface{}) {
 	if c.Server.Logging.AuditEncoder != nil {
 		err := c.Server.Logging.AuditEncoder.Encode(v)
 		if err != nil {
-			c.ApplicationLogf("Could not log audit event: %+v - Error: %v\n", err)
+			c.ApplicationLogf("could not log audit event: %+v - Error: %v\n", err)
 		}
 	}
 }
@@ -377,11 +446,11 @@ func isKeyPairVaild(cert, key string) error {
 func isValidPEMFile(p string) error {
 	pemData, err := ioutil.ReadFile(p)
 	if err != nil {
-		return fmt.Errorf("Could not read PEM file: %v", err)
+		return fmt.Errorf("could not read PEM file: %v", err)
 	}
 	block, rest := pem.Decode(pemData)
 	if len(rest) > 0 || block.Type == "" {
-		return fmt.Errorf("Not valid PEM format: Rest: %v Type: %v", len(rest), block.Type)
+		return fmt.Errorf("invalid PEM format: Rest: %v Type: %v", len(rest), block.Type)
 	}
 	return nil
 }
@@ -404,7 +473,7 @@ func loadKeytabFromVault(p string, vc *vaultclient.Client) (kt keytab.Keytab, er
 		}
 		return
 	}
-	err = errors.New("Keytab not found in vault")
+	err = errors.New("keytab not found in vault")
 	return
 }
 
@@ -414,7 +483,7 @@ func ldapConn(l LDAPBasic) (c *ldap.Conn, err error) {
 	}
 	if l.TLSEnabled {
 		if l.TrustedCAPath == "" {
-			err = errors.New("Trusted CA for LDAPS connection not defined")
+			err = errors.New("trusted CA for LDAPS connection not defined")
 			return
 		}
 		cp := x509.NewCertPool()

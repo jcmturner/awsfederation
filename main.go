@@ -4,18 +4,15 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/mux"
 	"github.com/jcmturner/awsfederation/config"
+	"github.com/jcmturner/awsfederation/database"
 	"github.com/jcmturner/awsfederation/federationuser"
 	"github.com/jcmturner/awsfederation/httphandling"
 	"log"
 	"net/http"
 	"os"
-	//_ "github.com/jcmturner/mysql"
-	_ "github.com/go-sql-driver/mysql"
-	//TODO uncomment once apprach for Vault testing sorted //_ "github.com/go-sql-driver/mysql"
-	"github.com/jcmturner/awsfederation/database"
-	"github.com/jcmturner/vaultclient"
 	"strings"
 )
 
@@ -38,12 +35,11 @@ func (a *app) initialize(configPath string) {
 	c.ApplicationLogf(c.Summary())
 
 	// Initialise the HTTP router
-	a.Router = httphandling.NewRouter(a.Config, a.PreparedStmts)
+	a.Router = httphandling.NewRouter(a.Config, a.PreparedStmts, a.FedUserCache)
 
 	// Set up the database connection
 	dbs := c.Database.ConnectionString
-	vc, err := vaultclient.NewClient(c.Vault.Config, c.Vault.Credentials)
-	dbm, err := vc.Read(c.Database.CredentialsVaultPath)
+	dbm, err := c.Vault.Client.Read(c.Database.CredentialsVaultPath)
 	if err != nil {
 		c.ApplicationLogf("Failed to load database credentials from the vault: %v", err)
 		log.Fatalf("Failed to load database credentials from the vault: %v\n", err)

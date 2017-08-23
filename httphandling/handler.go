@@ -55,13 +55,13 @@ func respondWithJSON(w http.ResponseWriter, httpCode int, payload interface{}) {
 }
 
 func respondUnauthorized(w http.ResponseWriter, c *config.Config) {
-	if c.Authentication.Kerberos.Enabled {
+	if c.Server.Authentication.Kerberos.Enabled {
 		w.Header().Set("WWW-Authenticate", "Negotiate")
 	}
-	if c.Authentication.Basic.Enabled {
+	if c.Server.Authentication.Basic.Enabled {
 		hv := "Basic"
-		if c.Authentication.Basic.Realm != "" {
-			hv = hv + ` realm="` + c.Authentication.Basic.Realm + `"`
+		if c.Server.Authentication.Basic.Realm != "" {
+			hv = hv + ` realm="` + c.Server.Authentication.Basic.Realm + `"`
 		}
 		w.Header().Set("WWW-Authenticate", hv)
 	}
@@ -70,7 +70,7 @@ func respondUnauthorized(w http.ResponseWriter, c *config.Config) {
 
 func MethodNotAllowed() http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		respondGeneric(w, http.StatusMethodNotAllowed, appcode.BAD_DATA, fmt.Sprintf("The %s method cannot be performed against this part of the API", r.Method))
+		respondGeneric(w, http.StatusMethodNotAllowed, appcode.BadData, fmt.Sprintf("The %s method cannot be performed against this part of the API", r.Method))
 		return
 	})
 }

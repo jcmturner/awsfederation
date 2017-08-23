@@ -15,7 +15,7 @@ type ErrUnauthorized struct {
 	Text    string
 }
 
-type ErrFederationFailure struct {
+type ErrAssumeRoleFailure struct {
 	AppCode int
 	Text    string
 }
@@ -25,13 +25,18 @@ type ErrFederationUserNotFound struct {
 	Text    string
 }
 
+type ErrBadPostData struct {
+	Code int
+	Text string
+}
+
 func (e ErrInvalidAuthentication) Error() string {
 	return e.Text
 }
 
 func (e ErrInvalidAuthentication) Errorf(format string, a ...interface{}) ErrInvalidAuthentication {
 	e.Text = fmt.Sprintf(format, a)
-	e.AppCode = appcode.FEDERATIONUSER_UNKNOWN
+	e.AppCode = appcode.InvalidAuthentication
 	return e
 }
 
@@ -41,17 +46,17 @@ func (e ErrUnauthorized) Error() string {
 
 func (e ErrUnauthorized) Errorf(format string, a ...interface{}) ErrUnauthorized {
 	e.Text = fmt.Sprintf(format, a)
-	e.AppCode = appcode.FEDERATIONUSER_UNKNOWN
+	e.AppCode = appcode.Unauthorized
 	return e
 }
 
-func (e ErrFederationFailure) Error() string {
+func (e ErrAssumeRoleFailure) Error() string {
 	return e.Text
 }
 
-func (e ErrFederationFailure) Errorf(format string, a ...interface{}) ErrFederationFailure {
+func (e ErrAssumeRoleFailure) Errorf(format string, a ...interface{}) ErrAssumeRoleFailure {
 	e.Text = fmt.Sprintf(format, a)
-	e.AppCode = appcode.FEDERATIONUSER_UNKNOWN
+	e.AppCode = appcode.AssumeRoleError
 	return e
 }
 
@@ -61,6 +66,16 @@ func (e ErrFederationUserNotFound) Error() string {
 
 func (e ErrFederationUserNotFound) Errorf(format string, a ...interface{}) ErrFederationUserNotFound {
 	e.Text = fmt.Sprintf(format, a)
-	e.AppCode = appcode.FEDERATIONUSER_UNKNOWN
+	e.AppCode = appcode.FederationUserUnknown
+	return e
+}
+
+func (e ErrBadPostData) Error() string {
+	return e.Text
+}
+
+func (e ErrBadPostData) Errorf(format string, a ...interface{}) ErrBadPostData {
+	e.Text = fmt.Sprintf(format, a)
+	e.Code = appcode.BadData
 	return e
 }

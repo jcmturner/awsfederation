@@ -57,9 +57,9 @@ const (
 	}
 }
 `
-	Test_SecretsPath     = "/secret/awskeys/"
+	TestVaultRoot        = "/secret/"
 	Test_DB_Conn         = "${username}:${password}@tcp(127.0.0.1:3306)/awsfederation"
-	Test_DB_Creds_Path   = "/secret/dbcreds/"
+	Test_DB_Creds_Path   = "dbcreds"
 	Test_Arn_Stub        = "arn:aws:iam::123456789012:user"
 	Test_FedName         = "TestFedUser"
 	Test_Arn             = "arn:aws:iam::123456789012:user/test"
@@ -171,7 +171,7 @@ func initServer(t *testing.T) (*app, *httptest.Server) {
 	//ls.Addr().String())
 
 	// Form the configuration JSON text and write to a file
-	completeJson := fmt.Sprintf(TestConfigJSON, "127.0.0.1:9443", certPath, keyPath, auditLog.Name(), appLog.Name(), accessLog.Name(), Test_SecretsPath, addr, vCertFile.Name(), test_app_id, f.Name(), Test_DB_Conn, Test_DB_Creds_Path)
+	completeJson := fmt.Sprintf(TestConfigJSON, "127.0.0.1:9443", certPath, keyPath, auditLog.Name(), appLog.Name(), accessLog.Name(), TestVaultRoot, addr, vCertFile.Name(), test_app_id, f.Name(), Test_DB_Conn, Test_DB_Creds_Path)
 	testConfigFile, _ := ioutil.TempFile(os.TempDir(), "config")
 	defer os.Remove(testConfigFile.Name())
 	testConfigFile.WriteString(completeJson)
@@ -186,7 +186,7 @@ func initServer(t *testing.T) (*app, *httptest.Server) {
 func populateVault(t *testing.T, addr string, certPool *x509.CertPool, test_app_id, test_user_id string) {
 	c := restclient.NewConfig().WithEndPoint(addr).WithCACertPool(certPool)
 	vconf := vaultclient.Config{
-		SecretsPath:      Test_SecretsPath,
+		SecretsPath:      TestVaultRoot,
 		ReSTClientConfig: *c,
 	}
 	vcreds := vaultclient.Credentials{

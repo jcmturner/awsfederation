@@ -3,7 +3,6 @@ package httphandling
 import (
 	"encoding/json"
 	"github.com/jcmturner/awsfederation/config"
-	"github.com/jcmturner/goidentity"
 	"net/http"
 	"net/url"
 	"time"
@@ -39,8 +38,8 @@ func accessLogger(inner http.Handler, c *config.Config) http.Handler {
 			Time:        start,
 			Duration:    time.Since(start),
 		}
-		ctx := r.Context()
-		if id, ok := ctx.Value(CTXKey_Authn).(goidentity.Identity); ok {
+		id, err := GetIdentity(r.Context())
+		if err == nil {
 			l.Username = id.UserName()
 			l.UserRealm = id.Domain()
 		}
