@@ -3,6 +3,7 @@ package awsfederation
 import (
 	"crypto/x509"
 	"fmt"
+	"github.com/jcmturner/awsfederation/appcode"
 	"github.com/jcmturner/awsfederation/federationuser"
 	"github.com/jcmturner/awsfederation/httphandling"
 	"github.com/jcmturner/awsvaultcredsprovider"
@@ -12,7 +13,6 @@ import (
 	"github.com/jcmturner/vaultmock"
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -77,6 +77,8 @@ const (
 	Test_AccessKeyId2     = "ASIAJEXAMPLEXEG2JICEB"
 	Test_MFASerial2       = "arn:aws:iam::223456789012:mfa/test2"
 	Test_MFASecret2       = "V2NFI2CRKFCMZJD232ONV5OLVPN5H3ZO2553QHFPXJK4BJN4X3JBYEQ6DJSBXE7H"
+
+	MessageTemplateJSON = "{\"Message\":\"%s\",\"HTTPCode\":%d,\"ApplicationCode\":%d}"
 )
 
 func TestFederationUserRestAPI(t *testing.T) {
@@ -90,25 +92,26 @@ func TestFederationUserRestAPI(t *testing.T) {
 		HttpCode       int
 		ResponseString string
 	}{
-		{"GET", "/" + httphandling.APIVersion + "/federationuser/" + Test_Arn, "", http.StatusOK, "{\"Arn\":\"" + Test_Arn + "\",\"Credentials\":{\"SecretAccessKey\":\"REDACTED\",\"SessionToken\":\"REDACTED\",\"Expiration\":\"" + Test_Expiration + "\",\"AccessKeyId\":\"" + Test_AccessKeyId + "\"},\"TTL\":0,\"MFASerialNumber\":\"\",\"MFASecret\":\"\"}"},
+		{"GET", "/" + httphandling.APIVersion + "/federationuser/" + Test_Arn, "", http.StatusOK, "{\"Name\":\"\",\"Arn\":\"" + Test_Arn + "\",\"Credentials\":{\"SecretAccessKey\":\"REDACTED\",\"SessionToken\":\"REDACTED\",\"Expiration\":\"" + Test_Expiration + "\",\"AccessKeyId\":\"" + Test_AccessKeyId + "\"},\"TTL\":0,\"MFASerialNumber\":\"\",\"MFASecret\":\"\"}"},
 		{"GET", "/" + httphandling.APIVersion + "/federationuser", "", http.StatusOK, "{\"FederationUsers\":[\"" + Test_Arn + "\"]}"},
 		{"GET", "/" + httphandling.APIVersion + "/federationuser/" + Test_Arn_Stub, "", http.StatusOK, "{\"FederationUsers\":[\"" + Test_Arn + "\"]}"},
-		{"GET", "/" + httphandling.APIVersion + "/federationuser/arn:aws:iam::123456789012:user/notexist", "", http.StatusNotFound, "{\"Message\":\"Federation user not found.\",\"HTTPCode\":404,\"ApplicationCode\":101}"},
-		{"POST", "/" + httphandling.APIVersion + "/federationuser", "{\"Name\":\"" + Test_FedName + "\",\"Arn\":\"" + Test_Arn + "\",\"Credentials\":{\"SecretAccessKey\":\"REDACTED\",\"SessionToken\":\"\",\"Expiration\":\"" + Test_Expiration + "\",\"AccessKeyId\":\"" + Test_AccessKeyId + "\"},\"TTL\":0,\"MFASerialNumber\":\"\",\"MFASecret\":\"\"}", http.StatusConflict, "{\"Message\":\"Federation user already exists.\",\"HTTPCode\":409,\"ApplicationCode\":102}"},
-		{"POST", "/" + httphandling.APIVersion + "/federationuser/" + Test_Arn, "{\"Arn\":\"" + Test_Arn + "\",\"Credentials\":{\"SecretAccessKey\":\"" + Test_SecretAccessKey2 + "\",\"SessionToken\":\"" + Test_SessionToken2 + "\",\"Expiration\":\"" + Test_Expiration2 + "\",\"AccessKeyId\":\"" + Test_AccessKeyId2 + "\"},\"TTL\":12,\"MFASerialNumber\":\"" + Test_MFASerial2 + "\",\"MFASecret\":\"" + Test_MFASecret2 + "\"}", http.StatusMethodNotAllowed, "{\"Message\":\"The POST method cannot be performed against this part of the API\",\"HTTPCode\":405,\"ApplicationCode\":1}"},
-		{"POST", "/" + httphandling.APIVersion + "/federationuser", "{\"Name\":\"" + Test_FedName2 + "\",\"Arn\":\"" + Test_Arn2 + "\",\"Credentials\":{\"SecretAccessKey\":\"" + Test_SecretAccessKey2 + "\",\"SessionToken\":\"" + Test_SessionToken2 + "\",\"Expiration\":\"" + Test_Expiration2 + "\",\"AccessKeyId\":\"" + Test_AccessKeyId2 + "\"},\"TTL\":12,\"MFASerialNumber\":\"" + Test_MFASerial2 + "\",\"MFASecret\":\"" + Test_MFASecret2 + "\"}", http.StatusOK, "{\"Message\":\"Federation user " + Test_Arn2 + " created.\",\"HTTPCode\":200,\"ApplicationCode\":0}"},
-		{"DELETE", "/" + httphandling.APIVersion + "/federationuser/" + Test_Arn2, "", http.StatusOK, "{\"Message\":\"Federation user " + Test_Arn2 + " deleted.\",\"HTTPCode\":200,\"ApplicationCode\":0}"},
-		{"GET", "/" + httphandling.APIVersion + "/federationuser/" + Test_Arn2, "", http.StatusNotFound, "{\"Message\":\"Federation user not found.\",\"HTTPCode\":404,\"ApplicationCode\":101}"},
-		{"POST", "/" + httphandling.APIVersion + "/federationuser", "{\"Name\":\"" + Test_FedName2 + "\",\"Arn\":\"" + Test_Arn2 + "\",\"Credentials\":{\"SecretAccessKey\":\"" + Test_SecretAccessKey2 + "\",\"SessionToken\":\"" + Test_SessionToken2 + "\",\"Expiration\":\"" + Test_Expiration2 + "\",\"AccessKeyId\":\"" + Test_AccessKeyId2 + "\"},\"TTL\":12,\"MFASerialNumber\":\"" + Test_MFASerial2 + "\",\"MFASecret\":\"" + Test_MFASecret2 + "\"}", http.StatusOK, "{\"Message\":\"Federation user " + Test_Arn2 + " created.\",\"HTTPCode\":200,\"ApplicationCode\":0}"},
+		{"GET", "/" + httphandling.APIVersion + "/federationuser/arn:aws:iam::123456789012:user/notexist", "", http.StatusNotFound, fmt.Sprintf(MessageTemplateJSON, "Federation user not found.", http.StatusNotFound, appcode.FederationUserUnknown)},
+		{"POST", "/" + httphandling.APIVersion + "/federationuser", "{\"Name\":\"" + Test_FedName + "\",\"Arn\":\"" + Test_Arn + "\",\"Credentials\":{\"SecretAccessKey\":\"REDACTED\",\"SessionToken\":\"\",\"Expiration\":\"" + Test_Expiration + "\",\"AccessKeyId\":\"" + Test_AccessKeyId + "\"},\"TTL\":0,\"MFASerialNumber\":\"\",\"MFASecret\":\"\"}", http.StatusConflict, fmt.Sprintf(MessageTemplateJSON, "Federation user already exists.", http.StatusConflict, appcode.FederationUserAlreadyExists)},
+		{"POST", "/" + httphandling.APIVersion + "/federationuser/" + Test_Arn, "{\"Arn\":\"" + Test_Arn + "\",\"Credentials\":{\"SecretAccessKey\":\"" + Test_SecretAccessKey2 + "\",\"SessionToken\":\"" + Test_SessionToken2 + "\",\"Expiration\":\"" + Test_Expiration2 + "\",\"AccessKeyId\":\"" + Test_AccessKeyId2 + "\"},\"TTL\":12,\"MFASerialNumber\":\"" + Test_MFASerial2 + "\",\"MFASecret\":\"" + Test_MFASecret2 + "\"}", http.StatusMethodNotAllowed, fmt.Sprintf(MessageTemplateJSON, "The POST method cannot be performed against this part of the API", http.StatusMethodNotAllowed, appcode.BadData)},
+		{"POST", "/" + httphandling.APIVersion + "/federationuser", "{\"Name\":\"" + Test_FedName2 + "\",\"Arn\":\"" + Test_Arn2 + "\",\"Credentials\":{\"SecretAccessKey\":\"" + Test_SecretAccessKey2 + "\",\"SessionToken\":\"" + Test_SessionToken2 + "\",\"Expiration\":\"" + Test_Expiration2 + "\",\"AccessKeyId\":\"" + Test_AccessKeyId2 + "\"},\"TTL\":12,\"MFASerialNumber\":\"" + Test_MFASerial2 + "\",\"MFASecret\":\"" + Test_MFASecret2 + "\"}", http.StatusOK, fmt.Sprintf(MessageTemplateJSON, "Federation user "+Test_Arn2+" created.", http.StatusOK, appcode.Info)},
+		{"DELETE", "/" + httphandling.APIVersion + "/federationuser/" + Test_Arn2, "", http.StatusOK, fmt.Sprintf(MessageTemplateJSON, "Federation user "+Test_Arn2+" deleted.", http.StatusNotFound, appcode.Info)},
+		{"GET", "/" + httphandling.APIVersion + "/federationuser/" + Test_Arn2, "", http.StatusNotFound, fmt.Sprintf(MessageTemplateJSON, "Federation user not found.", http.StatusNotFound, appcode.FederationUserUnknown)},
+		{"POST", "/" + httphandling.APIVersion + "/federationuser", "{\"Name\":\"" + Test_FedName2 + "\",\"Arn\":\"" + Test_Arn2 + "\",\"Credentials\":{\"SecretAccessKey\":\"" + Test_SecretAccessKey2 + "\",\"SessionToken\":\"" + Test_SessionToken2 + "\",\"Expiration\":\"" + Test_Expiration2 + "\",\"AccessKeyId\":\"" + Test_AccessKeyId2 + "\"},\"TTL\":12,\"MFASerialNumber\":\"" + Test_MFASerial2 + "\",\"MFASecret\":\"" + Test_MFASecret2 + "\"}", http.StatusOK, fmt.Sprintf(MessageTemplateJSON, "Federation user "+Test_Arn2+" created.", http.StatusOK, appcode.Info)},
 		{"GET", "/" + httphandling.APIVersion + "/federationuser/" + Test_Arn2, "", http.StatusOK, "{\"Arn\":\"" + Test_Arn2 + "\",\"Credentials\":{\"SecretAccessKey\":\"REDACTED\",\"SessionToken\":\"REDACTED\",\"Expiration\":\"" + Test_Expiration2 + "\",\"AccessKeyId\":\"" + Test_AccessKeyId2 + "\"},\"TTL\":12,\"MFASerialNumber\":\"" + Test_MFASerial2 + "\",\"MFASecret\":\"REDACTED\"}"},
 		{"GET", "/" + httphandling.APIVersion + "/federationuser", "", http.StatusOK, "{\"FederationUsers\":[\"" + Test_Arn + "\",\"" + Test_Arn2 + "\"]}"},
 		{"GET", "/" + httphandling.APIVersion + "/federationuser/" + Test_Arn_Stub, "", http.StatusOK, "{\"FederationUsers\":[\"" + Test_Arn + "\"]}"},
 		{"GET", "/" + httphandling.APIVersion + "/federationuser/" + Test_Arn_Stub2, "", http.StatusOK, "{\"FederationUsers\":[\"" + Test_Arn2 + "\"]}"},
-		{"PUT", "/" + httphandling.APIVersion + "/federationuser/" + Test_Arn_Stub + "/blah", "{\"Name\":\"" + Test_FedName + "\",\"Arn\":\"" + Test_Arn + "\",\"Credentials\":{\"SecretAccessKey\":\"REDACTED\",\"SessionToken\":\"REDACTED\",\"Expiration\":\"" + Test_Expiration + "\",\"AccessKeyId\":\"" + Test_AccessKeyId2 + "\"},\"TTL\":0,\"MFASerialNumber\":\"\",\"MFASecret\":\"\"}", http.StatusNotFound, "{\"Message\":\"Federation user not found.\",\"HTTPCode\":404,\"ApplicationCode\":101}"},
-		{"PUT", "/" + httphandling.APIVersion + "/federationuser/" + Test_Arn, "{\"Name\":\"" + Test_FedName + "\",\"Arn\":\"" + Test_Arn + "\",\"Credentials\":{\"SecretAccessKey\":\"REDACTED\",\"SessionToken\":\"REDACTED\",\"Expiration\":\"" + Test_Expiration + "\",\"AccessKeyId\":\"" + Test_AccessKeyId2 + "\"},\"TTL\":0,\"MFASerialNumber\":\"\",\"MFASecret\":\"\"}", http.StatusOK, "{\"Message\":\"Federation user " + Test_Arn + " updated.\",\"HTTPCode\":200,\"ApplicationCode\":0}"},
+		{"PUT", "/" + httphandling.APIVersion + "/federationuser/" + Test_Arn_Stub + "/blah", "{\"Name\":\"" + Test_FedName + "\",\"Arn\":\"" + Test_Arn + "\",\"Credentials\":{\"SecretAccessKey\":\"REDACTED\",\"SessionToken\":\"REDACTED\",\"Expiration\":\"" + Test_Expiration + "\",\"AccessKeyId\":\"" + Test_AccessKeyId2 + "\"},\"TTL\":0,\"MFASerialNumber\":\"\",\"MFASecret\":\"\"}", http.StatusNotFound, fmt.Sprintf(MessageTemplateJSON, "Federation user not found.", http.StatusNotFound, appcode.FederationUserUnknown)},
+		{"PUT", "/" + httphandling.APIVersion + "/federationuser/" + Test_Arn, "{\"Name\":\"" + Test_FedName + "\",\"Arn\":\"" + Test_Arn + "\",\"Credentials\":{\"SecretAccessKey\":\"REDACTED\",\"SessionToken\":\"REDACTED\",\"Expiration\":\"" + Test_Expiration + "\",\"AccessKeyId\":\"" + Test_AccessKeyId2 + "\"},\"TTL\":0,\"MFASerialNumber\":\"\",\"MFASecret\":\"\"}", http.StatusOK, fmt.Sprintf(MessageTemplateJSON, "Federation user "+Test_Arn+" updated.", http.StatusNotFound, appcode.Info)},
 		{"GET", "/" + httphandling.APIVersion + "/federationuser/" + Test_Arn, "", http.StatusOK, "{\"Arn\":\"" + Test_Arn + "\",\"Credentials\":{\"SecretAccessKey\":\"REDACTED\",\"SessionToken\":\"REDACTED\",\"Expiration\":\"" + Test_Expiration + "\",\"AccessKeyId\":\"" + Test_AccessKeyId2 + "\"},\"TTL\":0,\"MFASerialNumber\":\"\",\"MFASecret\":\"\"}"},
 	}
 	for _, test := range tests {
+		t.Logf("Test %s %s\n", test.Method, test.Path)
 		request, _ := http.NewRequest(test.Method, test.Path, strings.NewReader(test.PostPayload))
 		response := httptest.NewRecorder()
 		a.Router.ServeHTTP(response, request)
@@ -166,8 +169,8 @@ func initServer(t *testing.T) (*app, *httptest.Server) {
 	accessLog.Close()
 
 	// Get a listening socket for the server
-	ls, _ := net.Listen("tcp", "127.0.0.1:0")
-	ls.Close()
+	//ls, _ := net.Listen("tcp", "127.0.0.1:0")
+	//ls.Close()
 	//ls.Addr().String())
 
 	// Form the configuration JSON text and write to a file
