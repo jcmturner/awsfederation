@@ -3,17 +3,14 @@ package federationuser
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"github.com/jcmturner/awsfederation/config"
 	"github.com/jcmturner/awsfederation/database"
 	"github.com/jcmturner/gotestingtools/testingTLS"
 	"github.com/jcmturner/vaultmock"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/DATA-DOG/go-sqlmock.v1"
-	"io/ioutil"
 	"net/http/httptest"
 	"os"
-	"regexp"
 	"testing"
 	"time"
 )
@@ -72,62 +69,36 @@ const (
 
 func testEnv(t *testing.T) (*config.Config, *sql.DB, sqlmock.Sqlmock, map[int]*sqlmock.ExpectedPrepare, *database.StmtMap, *httptest.Server) {
 	// Database mock and prepare statements
-	db, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatalf("Error when opening a stub database connection: %v", err)
-	}
-
-	ep := make(map[int]*sqlmock.ExpectedPrepare)
-	//re := regexp.MustCompile(`\(.+?\)`)
-	for _, stmt := range database.Statements() {
-		ep[stmt.ID] = mock.ExpectPrepare(regexp.QuoteMeta(stmt.Query))
-		//ep[stmt.ID] = mock.ExpectPrepare(re.ReplaceAllString(stmt.Query, ""))
-	}
-	stmtMap, err := database.NewStmtMap(db)
-	if err != nil {
-		t.Fatalf("Error creating statement map: %v", err)
-	}
+	db, mock, ep, stmtMap := database.Mock(t)
 
 	// Start a mock vault process
-	s, addr, _, cert, test_app_id, test_user_id := vaultmock.RunMockVault(t)
+	s, addr, _, cert, appID, userID := vaultmock.RunMockVault(t)
 	vCertFile := testingTLS.WriteCertToFile(t, cert)
+	defer os.Remove(vCertFile.Name())
 
 	// Create a cert for the server
+	// TODO the testingTLS method should also return the cert as a cert object we can return to trust it.
 	certPath, keyPath, _, _ := testingTLS.GenerateSelfSignedTLSKeyPairFiles(t)
+	defer os.Remove(certPath)
+	defer os.Remove(keyPath)
 
-	// Create temp userid file
-	f, _ := ioutil.TempFile(os.TempDir(), "userid")
-	defer os.Remove(f.Name())
-	u := fmt.Sprintf(`{
-	"UserId": "%s"
-	}`, test_user_id)
-	f.WriteString(u)
-	f.Close()
-
-	// Create log files
-	//auditLog, _ := ioutil.TempFile(os.TempDir(), "mockAuditlogfile")
-	//defer os.Remove(auditLog.Name())
-	//auditLog.Close()
-	//appLog, _ := ioutil.TempFile(os.TempDir(), "mockApplogfile")
-	//defer os.Remove(appLog.Name())
-	//appLog.Close()
-	//accessLog, _ := ioutil.TempFile(os.TempDir(), "mockAccesslogfile")
-	//defer os.Remove(accessLog.Name())
-	//accessLog.Close()
-
-	// Get a listening socket for the server
-	//ls, _ := net.Listen("tcp", "127.0.0.1:0")
-	//ls.Close()
-	//ls.Addr().String())
+	c, _ := config.Mock()
+	c.SetTLS(
+		config.TLS{
+			Enabled:         true,
+			CertificateFile: certPath,
+			KeyFile:         keyPath,
+		})
+	c.SetVault(addr, vCertFile.Name(), appID, userID, Test_SecretsPath)
 
 	// Form the configuration JSON text and write to a file
-	completeJson := fmt.Sprintf(TestConfigJSON, "127.0.0.1:9443", certPath, keyPath, Test_SecretsPath, addr, vCertFile.Name(), test_app_id, f.Name())
+	//completeJson := fmt.Sprintf(TestConfigJSON, "127.0.0.1:9443", certPath, keyPath, Test_SecretsPath, addr, vCertFile.Name(), test_app_id, f.Name())
 	//t.Logf("Config:\n %s\n", completeJson)
 
-	c, err := config.Parse([]byte(completeJson))
-	if err != nil {
-		t.Fatalf("Error parsing configuration: %v", err)
-	}
+	//c, err := config.Parse([]byte(completeJson))
+	//if err != nil {
+	//	t.Fatalf("Error parsing configuration: %v", err)
+	//}
 
 	return c, db, mock, ep, stmtMap, s
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/jcmturner/restclient"
 	"github.com/jcmturner/vaultclient"
 	"gopkg.in/ldap.v2"
+	"io"
 	"io/ioutil"
 	"log"
 	"net"
@@ -308,21 +309,60 @@ func (c *Config) SetTLS(tlsConf TLS) *Config {
 	return c
 }
 
+func (c *Config) SetVault(addr, caFilePath, appID, userID, secretsRoot string) (*Config, error) {
+	vConf := vaultclient.Config{
+		SecretsPath:      secretsRoot,
+		ReSTClientConfig: *restclient.NewConfig().WithEndPoint(addr),
+	}
+	if caFilePath != "" {
+		vConf.ReSTClientConfig.WithCAFilePath(caFilePath)
+	}
+
+	vCreds := vaultclient.Credentials{
+		AppID:  appID,
+		UserID: userID,
+	}
+
+	vc, err := vaultclient.NewClient(&vConf, &vCreds)
+	if err != nil {
+		return c, err
+	}
+	c.Vault = Vault{
+		Config:      &vConf,
+		Credentials: &vCreds,
+		Client:      &vc,
+	}
+	return c, err
+}
+
+func (c *Config) logWriter(p string) (w io.Writer, err error) {
+	switch strings.ToLower(p) {
+	case "":
+		err = errors.New("log destination not specified, defaulting to stdout")
+		w = os.Stdout
+		//l = log.New(os.Stdout, "", log.Ldate|log.Ltime|log.Lshortfile)
+	case "stdout":
+		w = os.Stdout
+	case "stderr":
+		w = os.Stderr
+	default:
+		w, err = os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0640)
+	}
+	return
+}
+
 func (c *Config) SetAuditLogger(e *json.Encoder) *Config {
 	c.Server.Logging.AuditEncoder = e
 	return c
 }
 
 func (c *Config) SetAuditLogFile(p string) *Config {
-	if p == "" {
-		return c
-	}
-	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0640)
+	w, err := c.logWriter(p)
 	if err != nil {
 		c.ApplicationLogf("could not open audit log file: %v\n", err)
 	}
 	c.Server.Logging.AuditFile = p
-	enc := json.NewEncoder(f)
+	enc := json.NewEncoder(w)
 	c.SetAuditLogger(enc)
 	return c
 }
@@ -333,29 +373,23 @@ func (c *Config) SetApplicationLogger(l *log.Logger) *Config {
 }
 
 func (c *Config) SetApplicationLogFile(p string) *Config {
-	if p == "" {
-		return c
-	}
-	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	w, err := c.logWriter(p)
 	if err != nil {
 		c.ApplicationLogf("could not open application log file: %v\n", err)
 	}
-	l := log.New(f, "Application Log: ", log.Ldate|log.Ltime|log.Lshortfile)
 	c.Server.Logging.ApplicationFile = p
+	l := log.New(w, "AWS Federation Server: ", log.Ldate|log.Ltime|log.Lshortfile)
 	c.SetApplicationLogger(l)
 	return c
 }
 
 func (c *Config) SetAccessLogFile(p string) *Config {
-	if p == "" {
-		return c
-	}
-	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0640)
+	w, err := c.logWriter(p)
 	if err != nil {
 		c.ApplicationLogf("could not open access log file: %v\n", err)
 	}
 	c.Server.Logging.AccessLog = p
-	enc := json.NewEncoder(f)
+	enc := json.NewEncoder(w)
 	c.SetAccessEncoder(enc)
 	return c
 }
@@ -517,4 +551,27 @@ func loadLDAPBindPasswordFromVault(p string, vc *vaultclient.Client) (passwd str
 	}
 	err = errors.New("LDAP bind password not found in vault")
 	return
+}
+
+// Mock returns a minimal config for testing
+func Mock() (*Config, string) {
+	confJSON := fmt.Sprintf(TemplateJSON,
+		// Server level config
+		"127.0.0.1:8443", false, "", "",
+		// Kerberos SPNEGO config
+		false, "", "",
+		// Basic auth config
+		false, "", "",
+		// Kerberos basic auth config
+		"", "", "", "",
+		// LDAP basic auth config
+		"", "", "", "", "", "", "", "", "", "",
+		// Logging config
+		"stdout", "stderr", "stdout",
+		// Vault config
+		"secret", "127.0.0.1:9200", "", "", "", "",
+		// Database config
+		"127.0.0.1:3306", "database")
+	c, _ := Parse([]byte(confJSON)) // Ignoring the error as this should not error as it is to enable testing
+	return c, confJSON
 }
