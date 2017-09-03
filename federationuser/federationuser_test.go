@@ -1,46 +1,16 @@
 package federationuser
 
 import (
-	"database/sql"
 	"encoding/json"
-	"github.com/jcmturner/awsfederation/config"
 	"github.com/jcmturner/awsfederation/database"
-	"github.com/jcmturner/gotestingtools/testingTLS"
-	"github.com/jcmturner/vaultmock"
+	"github.com/jcmturner/awsfederation/test"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/DATA-DOG/go-sqlmock.v1"
-	"net/http/httptest"
-	"os"
 	"testing"
 	"time"
 )
 
 const (
-	TestConfigJSON = `
-{
-	"Server": {
-		"Socket": "%s",
-		"TLS": {
-			"Enabled": true,
-			"CertificateFile": "%s",
-			"KeyFile": "%s"
-		}
-	},
-	"Vault": {
-		"Config": {
-			"SecretsPath": "%s",
-			"VaultConnection": {
-				"EndPoint": "%s",
-				"TrustCACert": "%s"
-			}
-		},
-		"Credentials": {
-			"AppID": "%s",
-			"UserIDFile": "%s"
-		}
-
-	}
-}`
 	testFedUserJSON1 = `{
 	"Name": "FedUser1",
 	"Arn": "arn:aws:iam::123456789012:user",
@@ -54,7 +24,6 @@ const (
 	"MFASerialNumber": "arn:aws:iam::123456789012:mfa/test",
 	"MFASecret" "V2NFI2CRKFCMZJD232ONV5OLVPN5H3ZO2553QHFPXJK4BJN4X3JBYEQ6DJSBXE7H"
 }`
-	Test_SecretsPath            = "/secret/awskeys/"
 	testFedUserARN1             = "arn:aws:iam::123456789012:user/test1"
 	testFedUserName1            = "FedUser1"
 	testFedUserAccessKeyId1     = "ASIAJEXAMPLEXEG2JICEA"
@@ -67,46 +36,11 @@ const (
 	redacted                    = "REDACTED"
 )
 
-func testEnv(t *testing.T) (*config.Config, *sql.DB, sqlmock.Sqlmock, map[int]*sqlmock.ExpectedPrepare, *database.StmtMap, *httptest.Server) {
-	// Database mock and prepare statements
-	db, mock, ep, stmtMap := database.Mock(t)
-
-	// Start a mock vault process
-	s, addr, _, cert, appID, userID := vaultmock.RunMockVault(t)
-	vCertFile := testingTLS.WriteCertToFile(t, cert)
-	defer os.Remove(vCertFile.Name())
-
-	// Create a cert for the server
-	// TODO the testingTLS method should also return the cert as a cert object we can return to trust it.
-	certPath, keyPath, _, _ := testingTLS.GenerateSelfSignedTLSKeyPairFiles(t)
-	defer os.Remove(certPath)
-	defer os.Remove(keyPath)
-
-	c, _ := config.Mock()
-	c.SetTLS(
-		config.TLS{
-			Enabled:         true,
-			CertificateFile: certPath,
-			KeyFile:         keyPath,
-		})
-	c.SetVault(addr, vCertFile.Name(), appID, userID, Test_SecretsPath)
-
-	// Form the configuration JSON text and write to a file
-	//completeJson := fmt.Sprintf(TestConfigJSON, "127.0.0.1:9443", certPath, keyPath, Test_SecretsPath, addr, vCertFile.Name(), test_app_id, f.Name())
-	//t.Logf("Config:\n %s\n", completeJson)
-
-	//c, err := config.Parse([]byte(completeJson))
-	//if err != nil {
-	//	t.Fatalf("Error parsing configuration: %v", err)
-	//}
-
-	return c, db, mock, ep, stmtMap, s
-}
-
 func TestFederationUser_StoreLoadDelete(t *testing.T) {
-	c, db, _, ep, stmtMap, s := testEnv(t)
+	c, db, _, ep, stmtMap, s := test.TestEnv(t)
 	defer s.Close()
 	defer db.Close()
+
 	fu, err := NewFederationUser(c, testFedUserARN1)
 	if err != nil {
 		t.Fatalf("Error creating FederationUser: %v", err)
