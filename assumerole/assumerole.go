@@ -11,7 +11,7 @@ import (
 	"github.com/jcmturner/awsfederation/database"
 	"github.com/jcmturner/awsfederation/federationuser"
 	"github.com/jcmturner/awsfederation/sts"
-	"github.com/jcmturner/goidentity"
+	goidentity "gopkg.in/jcmturner/goidentity.v1"
 	"net/url"
 	"strconv"
 	"strings"
