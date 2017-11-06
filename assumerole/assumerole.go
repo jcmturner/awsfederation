@@ -6,7 +6,7 @@ import (
 	"fmt"
 	awssts "github.com/aws/aws-sdk-go/service/sts"
 	"github.com/hashicorp/go-uuid"
-	"github.com/jcmturner/awsfederation/apperrors"
+	"github.com/jcmturner/awsfederation/appcodes"
 	"github.com/jcmturner/awsfederation/config"
 	"github.com/jcmturner/awsfederation/database"
 	"github.com/jcmturner/awsfederation/federationuser"
@@ -86,7 +86,7 @@ func Federate(u goidentity.Identity, id string, stmtMap database.StmtMap, fc *fe
 		return
 	} else {
 		d.Comment = "Access denied, user not authorized"
-		err = apperrors.ErrUnauthorized{}.Errorf(d.Comment)
+		err = appcodes.ErrUnauthorized{}.Errorf(d.Comment)
 		auditLog(auditLine, d, c)
 		return
 	}

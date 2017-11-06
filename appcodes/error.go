@@ -1,8 +1,7 @@
-package apperrors
+package appcodes
 
 import (
 	"fmt"
-	"github.com/jcmturner/awsfederation/appcode"
 )
 
 type ErrInvalidAuthentication struct {
@@ -36,7 +35,7 @@ func (e ErrInvalidAuthentication) Error() string {
 
 func (e ErrInvalidAuthentication) Errorf(format string, a ...interface{}) ErrInvalidAuthentication {
 	e.Text = fmt.Sprintf(format, a)
-	e.AppCode = appcode.InvalidAuthentication
+	e.AppCode = InvalidAuthentication
 	return e
 }
 
@@ -46,7 +45,7 @@ func (e ErrUnauthorized) Error() string {
 
 func (e ErrUnauthorized) Errorf(format string, a ...interface{}) ErrUnauthorized {
 	e.Text = fmt.Sprintf(format, a)
-	e.AppCode = appcode.Unauthorized
+	e.AppCode = Unauthorized
 	return e
 }
 
@@ -56,7 +55,7 @@ func (e ErrAssumeRoleFailure) Error() string {
 
 func (e ErrAssumeRoleFailure) Errorf(format string, a ...interface{}) ErrAssumeRoleFailure {
 	e.Text = fmt.Sprintf(format, a)
-	e.AppCode = appcode.AssumeRoleError
+	e.AppCode = AssumeRoleError
 	return e
 }
 
@@ -66,7 +65,7 @@ func (e ErrFederationUserNotFound) Error() string {
 
 func (e ErrFederationUserNotFound) Errorf(format string, a ...interface{}) ErrFederationUserNotFound {
 	e.Text = fmt.Sprintf(format, a)
-	e.AppCode = appcode.FederationUserUnknown
+	e.AppCode = FederationUserUnknown
 	return e
 }
 
@@ -76,6 +75,6 @@ func (e ErrBadPostData) Error() string {
 
 func (e ErrBadPostData) Errorf(format string, a ...interface{}) ErrBadPostData {
 	e.Text = fmt.Sprintf(format, a)
-	e.Code = appcode.BadData
+	e.Code = BadData
 	return e
 }

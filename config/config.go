@@ -2,8 +2,6 @@ package config
 
 import (
 	"crypto/tls"
-	"crypto/x509"
-	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
@@ -59,6 +57,10 @@ const (
 					"BindUserPasswordVaultPath": "%s",
 					"TLSEnabled": %t,
 					"TrustedCAPath": "%s"
+				},
+				"Static": {
+					"RequiredSecret": "%s",
+					"Attribute": "%s"
 				}
 			}
 		},
@@ -89,6 +91,8 @@ const (
 	}
 }
 `
+	MockStaticSecret    = "mocktestsecret"
+	MockStaticAttribute = "authzattrib"
 )
 
 type Config struct {
@@ -100,7 +104,6 @@ type Config struct {
 type Vault struct {
 	Config      *vaultclient.Config      `json:"Config"`
 	Credentials *vaultclient.Credentials `json:"Credentials"`
-	Client      *vaultclient.Client
 }
 
 type Server struct {
@@ -129,11 +132,12 @@ type Kerberos struct {
 }
 
 type BasicAuth struct {
-	Enabled  bool      `json:"Enabled"`
-	Realm    string    `json:"Realm"`
-	Protocol string    `json:"Protocol"` // Kerberos or LDAP
-	Kerberos KRB5Basic `json:"Kerberos"`
-	LDAP     LDAPBasic `json:"LDAP"`
+	Enabled  bool        `json:"Enabled"`
+	Realm    string      `json:"Realm"`
+	Protocol string      `json:"Protocol"` // Kerberos or LDAP or Static
+	Kerberos KRB5Basic   `json:"Kerberos"`
+	LDAP     LDAPBasic   `json:"LDAP"`
+	Static   StaticBasic `json:"Static"`
 }
 
 type LDAPBasic struct {
@@ -158,6 +162,11 @@ type KRB5Basic struct {
 	Keytab          *keytab.Keytab
 	ServiceAccount  string `json:"ServiceAccount"`
 	SPN             string `json:"SPN"`
+}
+
+type StaticBasic struct {
+	RequiredSecret string `json:"RequiredSecret"`
+	Attribute      string `json:"Attribute"`
 }
 
 type JWT struct {
@@ -214,59 +223,6 @@ func Parse(b []byte) (c *Config, err error) {
 		c.ApplicationLogf(err.Error())
 		return
 	}
-	vc, err := vaultclient.NewClient(c.Vault.Config, c.Vault.Credentials)
-	c.Vault.Client = &vc
-	if c.Server.Authentication.Kerberos.Enabled {
-		if c.Server.Authentication.Kerberos.KeytabVaultPath == "" {
-			err = errors.New("kerberos authentication enabled but no path to keytab in vault defined")
-		}
-		var kt keytab.Keytab
-		kt, err = loadKeytabFromVault(c.Vault.Config.SecretsPath+c.Server.Authentication.Kerberos.KeytabVaultPath, c.Vault.Client)
-		if err != nil {
-			err = fmt.Errorf("error loading keytab for kerberos authentication from vault: %v", err)
-			c.ApplicationLogf(err.Error())
-			return
-		}
-		c.Server.Authentication.Kerberos.Keytab = &kt
-	}
-	if c.Server.Authentication.Basic.Enabled {
-		switch strings.ToLower(c.Server.Authentication.Basic.Protocol) {
-		case "ldap":
-			c.Server.Authentication.Basic.LDAP.BindUserPassword, err = loadLDAPBindPasswordFromVault(c.Server.Authentication.Basic.LDAP.BindUserPasswordVaultPath, c.Vault.Client)
-			if err != nil {
-				err = fmt.Errorf("error loading LDAP bind password from vault: %v", err)
-				c.ApplicationLogf(err.Error())
-				return
-			}
-			var lc *ldap.Conn
-			lc, err = ldapConn(c.Server.Authentication.Basic.LDAP)
-			if err != nil {
-				err = fmt.Errorf("error getting LDAP connection: %v", err)
-				c.ApplicationLogf(err.Error())
-				return
-			}
-			c.Server.Authentication.Basic.LDAP.LDAPConn = lc
-		case "kerberos":
-			c.Server.Authentication.Basic.Kerberos.Conf, err = krb5config.Load(c.Server.Authentication.Basic.Kerberos.KRB5ConfPath)
-			if err != nil {
-				err = fmt.Errorf("invalid kerberos basic authentication configuration: %v", err)
-				c.ApplicationLogf(err.Error())
-				return
-			}
-			var kt keytab.Keytab
-			kt, err = loadKeytabFromVault(c.Vault.Config.SecretsPath+c.Server.Authentication.Basic.Kerberos.KeytabVaultPath, c.Vault.Client)
-			if err != nil {
-				err = errors.New("error loading keytab for kerberos basic authentication from vault: %v")
-				c.ApplicationLogf(err.Error())
-				return
-			}
-			c.Server.Authentication.Basic.Kerberos.Keytab = &kt
-		default:
-			err = fmt.Errorf("invalid protocol (%v) for basic authentication", c.Server.Authentication.Basic.Protocol)
-			c.ApplicationLogf(err.Error())
-			return
-		}
-	}
 	return
 }
 
@@ -309,7 +265,7 @@ func (c *Config) SetTLS(tlsConf TLS) *Config {
 	return c
 }
 
-func (c *Config) SetVault(addr, caFilePath, appID, userID, secretsRoot string) (*Config, error) {
+func (c *Config) SetVault(addr, caFilePath, appID, userID, secretsRoot string) *Config {
 	vConf := vaultclient.Config{
 		SecretsPath:      secretsRoot,
 		ReSTClientConfig: *restclient.NewConfig().WithEndPoint(addr),
@@ -323,16 +279,11 @@ func (c *Config) SetVault(addr, caFilePath, appID, userID, secretsRoot string) (
 		UserID: userID,
 	}
 
-	vc, err := vaultclient.NewClient(&vConf, &vCreds)
-	if err != nil {
-		return c, err
-	}
 	c.Vault = Vault{
 		Config:      &vConf,
 		Credentials: &vCreds,
-		Client:      &vc,
 	}
-	return c, err
+	return c
 }
 
 func (c *Config) logWriter(p string) (w io.Writer, err error) {
@@ -489,70 +440,6 @@ func isValidPEMFile(p string) error {
 	return nil
 }
 
-func loadKeytabFromVault(p string, vc *vaultclient.Client) (kt keytab.Keytab, err error) {
-	m, e := vc.Read(p)
-	if err != nil {
-		err = e
-		return
-	}
-	if khex, ok := m["keytab"]; ok {
-		var kb []byte
-		kb, err = hex.DecodeString(khex.(string))
-		if err != nil {
-			return
-		}
-		kt, err = keytab.Parse(kb)
-		if err != nil {
-			return
-		}
-		return
-	}
-	err = errors.New("keytab not found in vault")
-	return
-}
-
-func ldapConn(l LDAPBasic) (c *ldap.Conn, err error) {
-	if l.EndPoint == "" {
-		err = errors.New("LDAP endpoint not defined")
-	}
-	if l.TLSEnabled {
-		if l.TrustedCAPath == "" {
-			err = errors.New("trusted CA for LDAPS connection not defined")
-			return
-		}
-		cp := x509.NewCertPool()
-		// Load our trusted certificate path
-		pemData, e := ioutil.ReadFile(l.TrustedCAPath)
-		if err != nil {
-			err = fmt.Errorf("CA certificate for LDAP could not be read from file: %v", e)
-			return
-		}
-		ok := cp.AppendCertsFromPEM(pemData)
-		if !ok {
-			err = fmt.Errorf("CA certificate for LDAP could not be loaded from file, is it PEM format? %v", err)
-			return
-		}
-		tlsConfig := &tls.Config{RootCAs: cp}
-		c, err = ldap.DialTLS("tcp", l.EndPoint, tlsConfig)
-		return
-	}
-	c, err = ldap.Dial("tcp", l.EndPoint)
-	return
-}
-
-func loadLDAPBindPasswordFromVault(p string, vc *vaultclient.Client) (passwd string, err error) {
-	m, err := vc.Read(p)
-	if err != nil {
-		return
-	}
-	if pswd, ok := m["password"]; ok {
-		passwd = pswd.(string)
-		return
-	}
-	err = errors.New("LDAP bind password not found in vault")
-	return
-}
-
 // Mock returns a minimal config for testing
 func Mock() (*Config, string) {
 	confJSON := fmt.Sprintf(TemplateJSON,
@@ -561,17 +448,23 @@ func Mock() (*Config, string) {
 		// Kerberos SPNEGO config
 		false, "", "",
 		// Basic auth config
-		false, "", "",
+		true, "", "static",
 		// Kerberos basic auth config
 		"", "", "", "",
 		// LDAP basic auth config
-		"", "", "", "", "", "", "", "", "", "",
+		"", "", "", "", "", "", "", "", false, "",
+		// Static basic used for testing
+		MockStaticSecret, MockStaticAttribute,
 		// Logging config
 		"stdout", "stderr", "stdout",
 		// Vault config
-		"secret", "127.0.0.1:9200", "", "", "", "",
+		"secret", "https://127.0.0.1:9200", "", "", "userid", "",
 		// Database config
 		"127.0.0.1:3306", "database")
-	c, _ := Parse([]byte(confJSON)) // Ignoring the error as this should not error as it is to enable testing
+	c, err := Parse([]byte(confJSON))
+	if err != nil {
+		// Can panic as this should only be used in tests!!!
+		panic(fmt.Sprintf("%v: %s", err, confJSON))
+	}
 	return c, confJSON
 }

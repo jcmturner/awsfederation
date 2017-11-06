@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/hashicorp/go-uuid"
-	"github.com/jcmturner/awsfederation/appcode"
+	"github.com/jcmturner/awsfederation/appcodes"
 	"github.com/jcmturner/awsfederation/config"
 	goidentity "gopkg.in/jcmturner/goidentity.v1"
 	"gopkg.in/jcmturner/gokrb5.v2/service"
@@ -27,7 +27,7 @@ func AuthnHandler(inner http.Handler, c *config.Config) http.Handler {
 		eventUUID, err := uuid.GenerateUUID()
 		if err != nil {
 			c.ApplicationLogf("error generating uuid for audit log event during authentication: %v", err)
-			respondGeneric(w, http.StatusInternalServerError, appcode.AuthenticationError, "Error processing authentication")
+			respondGeneric(w, http.StatusInternalServerError, appcodes.AuthenticationError, "Error processing authentication")
 			return
 		}
 		auditLine := config.AuditLogLine{
@@ -74,13 +74,19 @@ func AuthnHandler(inner http.Handler, c *config.Config) http.Handler {
 				a.Config = c.Server.Authentication.Basic.Kerberos.Conf
 				a.ServiceKeytab = c.Server.Authentication.Basic.Kerberos.Keytab
 				authenticator = a
+			case "static":
+				a := new(StaticAuthenticator)
+				a.BasicHeaderValue = s[1]
+				a.RequiredSecret = c.Server.Authentication.Basic.Static.RequiredSecret
+				a.StaticAttribute = c.Server.Authentication.Basic.Static.Attribute
+				authenticator = a
 			default:
 				c.ApplicationLogf("Configuration for basic authentication not valid. Protocol specified as: %v", c.Server.Authentication.Basic.Protocol)
-				respondGeneric(w, http.StatusInternalServerError, appcode.ServerConfigurationError, "Basic authentication not availbale")
+				respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "Basic authentication not availbale")
 				return
 			}
-		case "Bearer":
-			// TODO
+		//case "Bearer":
+		// TODO
 		default:
 			auditLine.EventType = "Failed Authentication"
 			msg := fmt.Sprintf("Authentication mechanism attempted by client (%s) not recognised", s[0])
@@ -93,7 +99,7 @@ func AuthnHandler(inner http.Handler, c *config.Config) http.Handler {
 		if err != nil {
 			e := "Authentication error with mechanism " + authenticator.Mechanism()
 			c.ApplicationLogf("%s: %v", e, err)
-			respondGeneric(w, http.StatusInternalServerError, appcode.AuthenticationError, e)
+			respondGeneric(w, http.StatusInternalServerError, appcodes.AuthenticationError, e)
 			return
 		}
 		if !authed {
@@ -164,18 +170,54 @@ func (a LDAPBasicAuthenticator) Authenticate() (i goidentity.Identity, ok bool, 
 		err = fmt.Errorf("authentication failed for user %s: %v", a.username, err)
 		return
 	}
-	i.SetUserName(a.username)
-	i.SetAuthTime(time.Now().UTC())
-	i.SetAuthenticated(true)
-	i.SetDisplayName(usRes.Entries[0].GetAttributeValue(a.LDAPConfig.DisplayNameAttribute))
+	u := goidentity.NewUser(a.username)
+	u.SetAuthTime(time.Now().UTC())
+	u.SetAuthenticated(true)
+	u.SetDisplayName(a.domain + "@" + a.username)
 	for g := range usRes.Entries[0].GetAttributeValues(a.LDAPConfig.MembershipAttribute) {
-		i.AddAuthzAttribute(usRes.Entries[0].GetAttributeValues(a.LDAPConfig.MembershipAttribute)[g])
+		u.AddAuthzAttribute(usRes.Entries[0].GetAttributeValues(a.LDAPConfig.MembershipAttribute)[g])
 	}
+	ok = true
+	i = &u
 	return
 }
 
 func (a LDAPBasicAuthenticator) Mechanism() string {
 	return "LDAP Basic"
+}
+
+// StaticAuthenticator is mainly for testing purposes. Do not use in production.
+type StaticAuthenticator struct {
+	BasicHeaderValue string
+	domain           string
+	username         string
+	password         string
+	RequiredSecret   string
+	StaticAttribute  string
+}
+
+func (a StaticAuthenticator) Authenticate() (i goidentity.Identity, ok bool, err error) {
+	a.domain, a.username, a.password, err = ParseBasicHeaderValue(a.BasicHeaderValue)
+	if err != nil {
+		err = fmt.Errorf("could not parse basic authentication header: %v", err)
+		return
+	}
+	if a.password != a.RequiredSecret {
+		err = fmt.Errorf("authentication failed for user %s@%s", a.username, a.domain)
+		return
+	}
+	u := goidentity.NewUser(a.username)
+	u.SetAuthTime(time.Now().UTC())
+	u.SetAuthenticated(true)
+	u.SetDisplayName(a.domain + "@" + a.username)
+	u.AddAuthzAttribute(a.StaticAttribute)
+	ok = true
+	i = &u
+	return
+}
+
+func (a StaticAuthenticator) Mechanism() string {
+	return "Static Basic"
 }
 
 func ParseBasicHeaderValue(s string) (domain, username, password string, err error) {
@@ -195,7 +237,7 @@ func ParseBasicHeaderValue(s string) (domain, username, password string, err err
 		domain = u[0]
 		username = u[1]
 	} else if strings.Contains(vc[0], `@`) {
-		u := strings.SplitN(vc[0], `\`, 2)
+		u := strings.SplitN(vc[0], `@`, 2)
 		domain = u[1]
 		username = u[0]
 	} else {

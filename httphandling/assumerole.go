@@ -3,8 +3,7 @@ package httphandling
 import (
 	"fmt"
 	"github.com/gorilla/mux"
-	"github.com/jcmturner/awsfederation/appcode"
-	"github.com/jcmturner/awsfederation/apperrors"
+	"github.com/jcmturner/awsfederation/appcodes"
 	"github.com/jcmturner/awsfederation/assumerole"
 	"github.com/jcmturner/awsfederation/config"
 	"github.com/jcmturner/awsfederation/database"
@@ -26,11 +25,11 @@ func getAssumeRoleFunc(c *config.Config, stmtMap *database.StmtMap, fc *federati
 		}
 		o, err := assumerole.Federate(u, roleID, *stmtMap, fc, c)
 		if err != nil {
-			if e, NotAuthz := err.(apperrors.ErrUnauthorized); NotAuthz {
+			if e, NotAuthz := err.(appcodes.ErrUnauthorized); NotAuthz {
 				respondGeneric(w, http.StatusUnauthorized, e.AppCode, e.Error())
 				return
 			}
-			respondGeneric(w, http.StatusInternalServerError, appcode.AssumeRoleError, err.Error())
+			respondGeneric(w, http.StatusInternalServerError, appcodes.AssumeRoleError, err.Error())
 			return
 		}
 		respondWithJSON(w, http.StatusOK, o)

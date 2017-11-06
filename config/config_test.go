@@ -35,6 +35,8 @@ const (
 	TestLDAPBindUserPasswordVaultPath = "bindpassword"
 	TestLDAPTLSEnabled                = true
 	TestLDAPTrustedCAPath             = "/some/path/to/cert.pem"
+	TestStaticSecret                  = "staticsecret"
+	TestStaticAttribute               = "staticattrib"
 	TestDBConn                        = "${username}:${password}@tcp(127.0.0.1:3306)/awsfederation"
 	TestDBCredsPath                   = "dbcreds"
 	TestKrb5Conf                      = `[libdefaults]
@@ -107,6 +109,8 @@ func TestLoad(t *testing.T) {
 		krbconf.Name(), TestKeytabVaultPath, "", TestSPN,
 		// LDAP basic auth config
 		TestLDAPEndpoint, TestLDAPBaseDN, TestUsernameAttribute, TestLDAPUserObjectClass, TestLDAPDisplayNameAttribute, TestLDAPMembershipAttribute, TestLDAPBindUserDN, TestLDAPBindUserPasswordVaultPath, TestLDAPTLSEnabled, TestLDAPTrustedCAPath,
+		// Static basic auth config
+		TestStaticSecret, TestStaticAttribute,
 		// Logging config
 		auditLog.Name(), appLog.Name(), accessLog.Name(),
 		// Vault config
@@ -142,6 +146,8 @@ func TestLoad(t *testing.T) {
 	assert.Equal(t, TestLDAPBindUserPasswordVaultPath, c.Server.Authentication.Basic.LDAP.BindUserPasswordVaultPath, "Bind user password vault path not as expected")
 	assert.True(t, c.Server.Authentication.Basic.LDAP.TLSEnabled, "LDAP TLS not enabled")
 	assert.Equal(t, TestLDAPTrustedCAPath, c.Server.Authentication.Basic.LDAP.TrustedCAPath, "LDAP connection trusted CA not as expected")
+	assert.Equal(t, TestStaticSecret, c.Server.Authentication.Basic.Static.RequiredSecret, "Static secret not as expected")
+	assert.Equal(t, TestStaticAttribute, c.Server.Authentication.Basic.Static.Attribute, "Static attribute not as expected")
 	assert.Equal(t, appLog.Name(), c.Server.Logging.ApplicationFile, "Application log filename not as expected")
 	assert.Equal(t, addr, *c.Vault.Config.ReSTClientConfig.EndPoint, "Endpoint on vault HTTP client not as expected")
 	assert.Equal(t, vcertFile.Name(), *c.Vault.Config.ReSTClientConfig.TrustCACert, "Trust CA cert on vault client not as expected")

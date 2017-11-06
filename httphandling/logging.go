@@ -33,7 +33,7 @@ func accessLogger(inner http.Handler, c *config.Config) http.Handler {
 			StatusCode:  ww.Status(),
 			Method:      r.Method,
 			ServerHost:  r.Host,
-			Path:        r.RequestURI,
+			Path:        r.URL.Path,
 			QueryString: r.URL.RawQuery,
 			Time:        start,
 			Duration:    time.Since(start),

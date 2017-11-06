@@ -1,4 +1,4 @@
-package appcode
+package appcodes
 
 const (
 	Info                     = 0

@@ -3,7 +3,7 @@ package httphandling
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/jcmturner/awsfederation/appcode"
+	"github.com/jcmturner/awsfederation/appcodes"
 	"github.com/jcmturner/awsfederation/config"
 	"net/http"
 )
@@ -65,12 +65,12 @@ func respondUnauthorized(w http.ResponseWriter, c *config.Config) {
 		}
 		w.Header().Set("WWW-Authenticate", hv)
 	}
-	respondGeneric(w, http.StatusUnauthorized, appcode.Unauthorized, "Unathorized")
+	respondGeneric(w, http.StatusUnauthorized, appcodes.Unauthorized, "Unathorized")
 }
 
 func MethodNotAllowed() http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		respondGeneric(w, http.StatusMethodNotAllowed, appcode.BadData, fmt.Sprintf("The %s method cannot be performed against this part of the API", r.Method))
+		respondGeneric(w, http.StatusMethodNotAllowed, appcodes.BadData, fmt.Sprintf("The %s method cannot be performed against this part of the API", r.Method))
 		return
 	})
 }
