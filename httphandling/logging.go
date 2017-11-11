@@ -42,6 +42,8 @@ func accessLogger(inner http.Handler, c *config.Config) http.Handler {
 		if err == nil {
 			l.Username = id.UserName()
 			l.UserRealm = id.Domain()
+		} else {
+			l.Username = err.Error()
 		}
 		c.AccessLog(l)
 	})

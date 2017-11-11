@@ -247,11 +247,21 @@ func ParseBasicHeaderValue(s string) (domain, username, password string, err err
 }
 
 func GetIdentity(ctx context.Context) (id goidentity.Identity, err error) {
-	if u, ok := ctx.Value(goidentity.CTXKey).(goidentity.Identity); ok {
-		id = u
+	u := ctx.Value(goidentity.CTXKey)
+	if u == nil {
+		err = errors.New("no identity found in context")
 		return
+	}
+	//idtype := reflect.TypeOf(&id).Elem()
+	if i, ok := u.(goidentity.Identity); ok {
+		id = i
+		return
+
+		//if reflect.TypeOf(u).Implements(idtype) {
+		//	id = u.(goidentity.Identity)
+		//	return
 	} else {
-		err = errors.New("No identity found in context")
+		err = errors.New("invalid identity found in context")
 		return
 	}
 }
