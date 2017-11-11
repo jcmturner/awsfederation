@@ -217,11 +217,13 @@ func Parse(b []byte) (c *Config, err error) {
 	c.SetAuditLogFile(c.Server.Logging.AuditFile)
 	c.SetAccessLogFile(c.Server.Logging.AccessLog)
 	c.Vault.Config.ReSTClientConfig.WithCAFilePath(*c.Vault.Config.ReSTClientConfig.TrustCACert)
-	err = c.Vault.Credentials.ReadUserID()
-	if err != nil {
-		err = fmt.Errorf("error configuring vault client: %v", err)
-		c.ApplicationLogf(err.Error())
-		return
+	if c.Vault.Credentials.UserID == "" {
+		err = c.Vault.Credentials.ReadUserID()
+		if err != nil {
+			err = fmt.Errorf("error configuring vault client: %v", err)
+			c.ApplicationLogf(err.Error())
+			return
+		}
 	}
 	return
 }

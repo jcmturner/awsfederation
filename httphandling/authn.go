@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/hashicorp/go-uuid"
 	"github.com/jcmturner/awsfederation/appcodes"
 	"github.com/jcmturner/awsfederation/config"
 	goidentity "gopkg.in/jcmturner/goidentity.v1"
@@ -14,33 +13,37 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"reflect"
 )
+
+const (
+	AuthMechanismNegotiate = "Negotiate"
+	AuthMechanismBasic = "Basic"
+	AuthMechanismBearer = "Bearer"
+)
+
+
 
 func AuthnHandler(inner http.Handler, c *config.Config) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		s := strings.SplitN(r.Header.Get("Authorization"), " ", 2)
-		if len(s) != 2 {
+		auditLine, err := newAuditLogLine("Authentication", c)
+		if err != nil {
+			respondGeneric(w, http.StatusInternalServerError, appcodes.AuthenticationError, "Error processing authentication")
+		}
+
+		mech, value, err := ParseAuthorizationHeader(r)
+		if err != nil {
+			auditLine.EventType = "Failed Authentication"
+			auditLog(auditLine, "could not parse authorization header", r, c)
 			respondUnauthorized(w, c)
 			return
 		}
+
 		var id goidentity.Identity
-		eventUUID, err := uuid.GenerateUUID()
-		if err != nil {
-			c.ApplicationLogf("error generating uuid for audit log event during authentication: %v", err)
-			respondGeneric(w, http.StatusInternalServerError, appcodes.AuthenticationError, "Error processing authentication")
-			return
-		}
-		auditLine := config.AuditLogLine{
-			Username:      "-",
-			UserDomain:    "-",
-			UserSessionID: "00000000-0000-0000-0000-000000000000",
-			Time:          time.Now().UTC(),
-			EventType:     "Authentication",
-			UUID:          eventUUID,
-		}
 		var authenticator goidentity.Authenticator
-		switch s[0] {
-		case "Negotiate":
+
+		switch mech {
+		case AuthMechanismNegotiate:
 			if !c.Server.Authentication.Kerberos.Enabled {
 				auditLine.EventType = "Failed Authentication"
 				auditLog(auditLine, "Negotiate mechanism attempted by client but disabled in server configuration", r, c)
@@ -51,9 +54,9 @@ func AuthnHandler(inner http.Handler, c *config.Config) http.Handler {
 			a.Keytab = c.Server.Authentication.Kerberos.Keytab
 			a.ServiceAccount = c.Server.Authentication.Kerberos.ServiceAccount
 			a.ClientAddr = r.RemoteAddr
-			a.SPNEGOHeaderValue = s[1]
+			a.SPNEGOHeaderValue = value
 			authenticator = a
-		case "Basic":
+		case AuthMechanismBasic:
 			if !c.Server.Authentication.Basic.Enabled {
 				auditLine.EventType = "Failed Authentication"
 				auditLog(auditLine, "Basic mechanism attempted by client but disabled in server configuration", r, c)
@@ -63,12 +66,12 @@ func AuthnHandler(inner http.Handler, c *config.Config) http.Handler {
 			switch strings.ToLower(c.Server.Authentication.Basic.Protocol) {
 			case "ldap":
 				a := new(LDAPBasicAuthenticator)
-				a.BasicHeaderValue = s[1]
+				a.BasicHeaderValue = value
 				a.LDAPConfig = c.Server.Authentication.Basic.LDAP
 				authenticator = a
 			case "kerberos":
 				a := new(service.KRB5BasicAuthenticator)
-				a.BasicHeaderValue = s[1]
+				a.BasicHeaderValue = value
 				a.ServiceAccount = c.Server.Authentication.Basic.Kerberos.ServiceAccount
 				a.SPN = c.Server.Authentication.Basic.Kerberos.SPN
 				a.Config = c.Server.Authentication.Basic.Kerberos.Conf
@@ -76,7 +79,7 @@ func AuthnHandler(inner http.Handler, c *config.Config) http.Handler {
 				authenticator = a
 			case "static":
 				a := new(StaticAuthenticator)
-				a.BasicHeaderValue = s[1]
+				a.BasicHeaderValue = value
 				a.RequiredSecret = c.Server.Authentication.Basic.Static.RequiredSecret
 				a.StaticAttribute = c.Server.Authentication.Basic.Static.Attribute
 				authenticator = a
@@ -85,11 +88,11 @@ func AuthnHandler(inner http.Handler, c *config.Config) http.Handler {
 				respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "Basic authentication not availbale")
 				return
 			}
-		//case "Bearer":
-		// TODO
+		//case AuthMechanismBearer:
+			// TODO
 		default:
 			auditLine.EventType = "Failed Authentication"
-			msg := fmt.Sprintf("Authentication mechanism attempted by client (%s) not recognised", s[0])
+			msg := fmt.Sprintf("Authentication mechanism attempted by client (%s) not supported", mech)
 			auditLog(auditLine, msg, r, c)
 			respondUnauthorized(w, c)
 			return
@@ -108,14 +111,18 @@ func AuthnHandler(inner http.Handler, c *config.Config) http.Handler {
 			respondUnauthorized(w, c)
 			return
 		}
+
 		auditLine.Username = id.UserName()
 		auditLine.UserDomain = id.Domain()
 		auditLine.EventType = "Authentication Successful"
 		auditLine.UserSessionID = id.SessionID()
 		auditLog(auditLine, "Client credentials valid", r, c)
+
+		// Set the request context
 		ctx := r.Context()
 		ctx = context.WithValue(ctx, goidentity.CTXKey, id)
 		r.WithContext(ctx)
+		// Serve the inner wrapped handler
 		inner.ServeHTTP(w, r)
 	})
 }
@@ -220,20 +227,48 @@ func (a StaticAuthenticator) Mechanism() string {
 	return "Static Basic"
 }
 
+func ParseAuthorizationHeader(r *http.Request) (mechanism, value string, err error) {
+	s := strings.SplitN(r.Header.Get("Authorization"), " ", 2)
+	if len(s) != 2 {
+		err = errors.New("request does not have a valid authorization header")
+		return
+	}
+	value = s[1]
+	switch strings.ToLower(s[0]) {
+	case strings.ToLower(AuthMechanismNegotiate):
+		mechanism = AuthMechanismNegotiate
+	case strings.ToLower(AuthMechanismBasic):
+		mechanism = AuthMechanismBasic
+	case strings.ToLower(AuthMechanismBearer):
+		mechanism = AuthMechanismBearer
+	default:
+		err = fmt.Errorf("authentication mechanism attempted by client (%s) not recognised", s[0])
+	}
+	return
+}
+
 func ParseBasicHeaderValue(s string) (domain, username, password string, err error) {
 	b, err := base64.StdEncoding.DecodeString(s)
 	if err != nil {
 		return
 	}
 	v := string(b)
+	if !strings.Contains(v, ":") {
+		return "", "", "", errors.New("invalid authorization header value")
+	}
 	vc := strings.SplitN(v, ":", 2)
 	password = vc[1]
 	// Domain and username can be specified in 2 formats:
 	// <Username> - no domain specified
 	// <Domain>\<Username>
+	// <Domain>/<Username>
 	// <Username>@<Domain>
 	if strings.Contains(vc[0], `\`) {
 		u := strings.SplitN(vc[0], `\`, 2)
+		domain = u[0]
+		username = u[1]
+	} else if strings.Contains(vc[0], `/`) {
+		u := strings.SplitN(vc[0], `/`, 2)
 		domain = u[0]
 		username = u[1]
 	} else if strings.Contains(vc[0], `@`) {
@@ -252,16 +287,14 @@ func GetIdentity(ctx context.Context) (id goidentity.Identity, err error) {
 		err = errors.New("no identity found in context")
 		return
 	}
-	//idtype := reflect.TypeOf(&id).Elem()
-	if i, ok := u.(goidentity.Identity); ok {
+	v := reflect.Indirect(reflect.New(reflect.TypeOf(u)))
+	v.Set(reflect.ValueOf(u))
+	p := v.Addr().Interface()
+
+	if i, ok := p.(goidentity.Identity); ok {
 		id = i
 		return
-
-		//if reflect.TypeOf(u).Implements(idtype) {
-		//	id = u.(goidentity.Identity)
-		//	return
-	} else {
-		err = errors.New("invalid identity found in context")
-		return
 	}
+	err = errors.New("invalid identity found in context")
+	return
 }

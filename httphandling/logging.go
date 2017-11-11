@@ -6,12 +6,14 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+	"github.com/hashicorp/go-uuid"
+	"fmt"
 )
 
 type AccessLog struct {
 	SourceIP    string        `json:"SourceIP"`
 	Username    string        `json:"Username"`
-	UserRealm   string        `json:"UserRealm"`
+	UserDomain   string        `json:"UserRealm"`
 	StatusCode  int           `json:"StatusCode"`
 	Method      string        `json:"Method"`
 	ServerHost  string        `json:"ServerHost"`
@@ -29,7 +31,7 @@ func accessLogger(inner http.Handler, c *config.Config) http.Handler {
 		l := AccessLog{
 			SourceIP:    r.RemoteAddr,
 			Username:    "-",
-			UserRealm:   "-",
+			UserDomain:   "-",
 			StatusCode:  ww.Status(),
 			Method:      r.Method,
 			ServerHost:  r.Host,
@@ -41,7 +43,7 @@ func accessLogger(inner http.Handler, c *config.Config) http.Handler {
 		id, err := GetIdentity(r.Context())
 		if err == nil {
 			l.Username = id.UserName()
-			l.UserRealm = id.Domain()
+			l.UserDomain = id.Domain()
 		} else {
 			l.Username = err.Error()
 		}
@@ -64,4 +66,21 @@ func auditLog(l config.AuditLogLine, msg string, r *http.Request, c *config.Conf
 	b, _ := json.Marshal(d)
 	l.Detail = url.QueryEscape(string(b))
 	c.AccessLog(l)
+}
+
+func newAuditLogLine(eventType string, c *config.Config) (config.AuditLogLine, error) {
+	eventUUID, err := uuid.GenerateUUID()
+	if err != nil {
+		err := fmt.Errorf("error generating uuid for audit log event of type %s: %v", eventType, err)
+		c.ApplicationLogf(err.Error())
+		return config.AuditLogLine{}, err
+	}
+	return config.AuditLogLine{
+		Username:      "-",
+		UserDomain:    "-",
+		UserSessionID: "00000000-0000-0000-0000-000000000000",
+		Time:          time.Now().UTC(),
+		EventType:     eventType,
+		UUID:          eventUUID,
+	}, nil
 }
