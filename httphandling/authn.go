@@ -26,95 +26,53 @@ const (
 
 func AuthnHandler(inner http.Handler, c *config.Config) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Get the audit log line template
 		auditLine, err := newAuditLogLine("Authentication", c)
 		if err != nil {
 			respondGeneric(w, http.StatusInternalServerError, appcodes.AuthenticationError, "Error processing authentication")
 		}
 
-		mech, value, err := ParseAuthorizationHeader(r)
-		if err != nil {
-			auditLine.EventType = "Failed Authentication"
-			auditLog(auditLine, "could not parse authorization header", r, c)
-			respondUnauthorized(w, c)
-			return
-		}
-
 		var id goidentity.Identity
-		var authenticator goidentity.Authenticator
-
-		switch mech {
-		case AuthMechanismNegotiate:
-			if !c.Server.Authentication.Kerberos.Enabled {
+		if sid, ok := getSession(r, c); ok {
+			// Request contains cookie for a valid session. Use ID from session cache.
+			id = sid
+			auditLine.EventType = "Authenication via session"
+		} else {
+			// Get the authenticator based on what the client specifies in the Authorization header and the server's configuration
+			authenticator, err := getAuthenticator(r, c)
+			if err != nil {
 				auditLine.EventType = "Failed Authentication"
-				auditLog(auditLine, "Negotiate mechanism attempted by client but disabled in server configuration", r, c)
+				auditLog(auditLine, err.Error(), r, c)
 				respondUnauthorized(w, c)
 				return
 			}
-			a := new(service.SPNEGOAuthenticator)
-			a.Keytab = c.Server.Authentication.Kerberos.Keytab
-			a.ServiceAccount = c.Server.Authentication.Kerberos.ServiceAccount
-			a.ClientAddr = r.RemoteAddr
-			a.SPNEGOHeaderValue = value
-			authenticator = a
-		case AuthMechanismBasic:
-			if !c.Server.Authentication.Basic.Enabled {
-				auditLine.EventType = "Failed Authentication"
-				auditLog(auditLine, "Basic mechanism attempted by client but disabled in server configuration", r, c)
+
+			// Authenitcate the user
+			var authed bool
+			id, authed, err = authenticator.Authenticate()
+			if err != nil {
+				e := "Authentication error with mechanism " + authenticator.Mechanism()
+				c.ApplicationLogf("%s: %v", e, err)
+				respondGeneric(w, http.StatusInternalServerError, appcodes.AuthenticationError, e)
+				return
+			}
+			if !authed {
+				auditLine.EventType = "Authentication Failed"
+				auditLog(auditLine, "Client credentials invalid", r, c)
 				respondUnauthorized(w, c)
 				return
 			}
-			switch strings.ToLower(c.Server.Authentication.Basic.Protocol) {
-			case "ldap":
-				a := new(LDAPBasicAuthenticator)
-				a.BasicHeaderValue = value
-				a.LDAPConfig = c.Server.Authentication.Basic.LDAP
-				authenticator = a
-			case "kerberos":
-				a := new(service.KRB5BasicAuthenticator)
-				a.BasicHeaderValue = value
-				a.ServiceAccount = c.Server.Authentication.Basic.Kerberos.ServiceAccount
-				a.SPN = c.Server.Authentication.Basic.Kerberos.SPN
-				a.Config = c.Server.Authentication.Basic.Kerberos.Conf
-				a.ServiceKeytab = c.Server.Authentication.Basic.Kerberos.Keytab
-				authenticator = a
-			case "static":
-				a := new(StaticAuthenticator)
-				a.BasicHeaderValue = value
-				a.RequiredSecret = c.Server.Authentication.Basic.Static.RequiredSecret
-				a.StaticAttribute = c.Server.Authentication.Basic.Static.Attribute
-				authenticator = a
-			default:
-				c.ApplicationLogf("Configuration for basic authentication not valid. Protocol specified as: %v", c.Server.Authentication.Basic.Protocol)
-				respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "Basic authentication not availbale")
-				return
+			auditLine.EventType = "Authentication Successful"
+			// Set the session cookie
+			err = setSession(w, id, c)
+			if err != nil {
+				c.ApplicationLogf("error setting user's session: %v", err)
 			}
-		//case AuthMechanismBearer:
-			// TODO
-		default:
-			auditLine.EventType = "Failed Authentication"
-			msg := fmt.Sprintf("Authentication mechanism attempted by client (%s) not supported", mech)
-			auditLog(auditLine, msg, r, c)
-			respondUnauthorized(w, c)
-			return
 		}
 
-		id, authed, err := authenticator.Authenticate()
-		if err != nil {
-			e := "Authentication error with mechanism " + authenticator.Mechanism()
-			c.ApplicationLogf("%s: %v", e, err)
-			respondGeneric(w, http.StatusInternalServerError, appcodes.AuthenticationError, e)
-			return
-		}
-		if !authed {
-			auditLine.EventType = "Authentication Failed"
-			auditLog(auditLine, "Client credentials invalid", r, c)
-			respondUnauthorized(w, c)
-			return
-		}
-
+		// Audit log
 		auditLine.Username = id.UserName()
 		auditLine.UserDomain = id.Domain()
-		auditLine.EventType = "Authentication Successful"
 		auditLine.UserSessionID = id.SessionID()
 		auditLog(auditLine, "Client credentials valid", r, c)
 
@@ -122,10 +80,70 @@ func AuthnHandler(inner http.Handler, c *config.Config) http.Handler {
 		ctx := r.Context()
 		ctx = context.WithValue(ctx, goidentity.CTXKey, id)
 		r.WithContext(ctx)
+
 		// Serve the inner wrapped handler
 		inner.ServeHTTP(w, r)
 	})
 }
+
+func getAuthenticator(r *http.Request, c *config.Config) (authenticator goidentity.Authenticator, err error){
+	mech, value, err := ParseAuthorizationHeader(r)
+	if err != nil {
+		err = errors.New("could not parse authorization header")
+		return
+	}
+
+	switch mech {
+	case AuthMechanismNegotiate:
+		if !c.Server.Authentication.Kerberos.Enabled {
+			err = fmt.Errorf("%s mechanism attempted by client but disabled in server configuration", mech)
+			return
+		}
+		a := new(service.SPNEGOAuthenticator)
+		a.Keytab = c.Server.Authentication.Kerberos.Keytab
+		a.ServiceAccount = c.Server.Authentication.Kerberos.ServiceAccount
+		a.ClientAddr = r.RemoteAddr
+		a.SPNEGOHeaderValue = value
+		authenticator = a
+	case AuthMechanismBasic:
+		if !c.Server.Authentication.Basic.Enabled {
+			err = fmt.Errorf("%s mechanism attempted by client but disabled in server configuration", mech)
+			return
+		}
+		switch strings.ToLower(c.Server.Authentication.Basic.Protocol) {
+		case "ldap":
+			a := new(LDAPBasicAuthenticator)
+			a.BasicHeaderValue = value
+			a.LDAPConfig = c.Server.Authentication.Basic.LDAP
+			authenticator = a
+		case "kerberos":
+			a := new(service.KRB5BasicAuthenticator)
+			a.BasicHeaderValue = value
+			a.ServiceAccount = c.Server.Authentication.Basic.Kerberos.ServiceAccount
+			a.SPN = c.Server.Authentication.Basic.Kerberos.SPN
+			a.Config = c.Server.Authentication.Basic.Kerberos.Conf
+			a.ServiceKeytab = c.Server.Authentication.Basic.Kerberos.Keytab
+			authenticator = a
+		case "static":
+			a := new(StaticAuthenticator)
+			a.BasicHeaderValue = value
+			a.RequiredSecret = c.Server.Authentication.Basic.Static.RequiredSecret
+			a.StaticAttribute = c.Server.Authentication.Basic.Static.Attribute
+			authenticator = a
+		default:
+			err = fmt.Errorf("Configuration for basic authentication not valid. Protocol specified as: %v", c.Server.Authentication.Basic.Protocol)
+			c.ApplicationLogf(err.Error())
+			return
+		}
+	//case AuthMechanismBearer:
+		// TODO
+	default:
+		err = fmt.Errorf("%s authentication mechanism attempted by client not supported", mech)
+		return
+	}
+	return
+}
+
 
 type LDAPBasicAuthenticator struct {
 	BasicHeaderValue string

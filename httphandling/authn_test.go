@@ -29,7 +29,7 @@ func TestLDAPBasicAuthenticator(t *testing.T) {
 func TestStaticAuthenticator(t *testing.T) {
 	var s StaticAuthenticator
 	a := new(goidentity.Authenticator)
-	assert.Implements(t, a, s, "LDAPBasicAuthenticator does not implement the goidentity.Authenticator interface")
+	assert.Implements(t, a, s, "StaticAuthenticator does not implement the goidentity.Authenticator interface")
 }
 
 func TestParseBasicHeaderValue(t *testing.T) {

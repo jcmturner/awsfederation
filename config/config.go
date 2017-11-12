@@ -62,7 +62,9 @@ const (
 					"RequiredSecret": "%s",
 					"Attribute": "%s"
 				}
-			}
+			},
+			"ActiveSessionTimeout": 15,
+			"SessionDuration": 60
 		},
 		"Logging": {
 			"Audit": "%s",
@@ -122,6 +124,8 @@ type Authentication struct {
 	Kerberos Kerberos  `json:"Kerberos"`
 	Basic    BasicAuth `json:"Basic"`
 	JWT      JWT       `json:"JWT"`
+	ActiveSessionTimeout int `json:"ActiveSessionTimeout"`  // Duration in minutes
+	SessionDuration int `json:"SessionDuration"`  // Duration in minutes
 }
 
 type Kerberos struct {

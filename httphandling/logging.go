@@ -25,7 +25,7 @@ type AccessLog struct {
 
 func accessLogger(inner http.Handler, c *config.Config) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
+		start := time.Now().UTC()
 		ww := NewResponseWriterWrapper(w)
 		inner.ServeHTTP(ww, r)
 		l := AccessLog{
