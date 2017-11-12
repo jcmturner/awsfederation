@@ -12,6 +12,7 @@
         
 ### Execution Order
 The above wrapping results in the following execution order:
+
 | # | Step                                                                                                                    | Handler/Method                                                         | Source File       |
 |---|-------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------|-------------------|
 | 1 | Set the standard response HTTP headers on the responseWriter                                                            | setHeaders                                                             | handler.go        |
