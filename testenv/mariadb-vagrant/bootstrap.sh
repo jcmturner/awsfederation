@@ -19,10 +19,6 @@ systemctl start mariadb
 
 mysql -u root -e "USE mysql; CREATE USER 'testadmin'@'%' IDENTIFIED BY 'testadminpass'; GRANT ALL PRIVILEGES ON *.* TO 'testadmin'@'%' WITH GRANT OPTION;"
 
-mysql> CREATE USER 'monty'@'%' IDENTIFIED BY 'some_pass';
-mysql> GRANT ALL PRIVILEGES ON *.* TO 'monty'@'%'
-    ->     WITH GRANT OPTION;
-
 cat <<EOF >> /etc/sysctl.conf
 net.ipv6.conf.all.disable_ipv6 = 1
 net.ipv6.conf.default.disable_ipv6 = 1

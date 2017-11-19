@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+	"sync"
 )
 
 func TestGetIdentity(t *testing.T) {
@@ -92,7 +93,8 @@ func TestAuthnHandlerAndSession(t *testing.T) {
 	response = httptest.NewRecorder()
 	request.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte("testuser@TESTING:"+config.MockStaticSecret)))
 	rt.ServeHTTP(response, request)
-	assert.Equal(t, http.StatusNoContent, response.Code, "Expected 204")
+	assert.Equal(t, http.StatusNoContent, response.Code, "Expected %d", http.StatusNoContent)
+
 	resp := http.Response{Header: response.Header()}
 	cookies := resp.Cookies()
 	var cookieFound bool
@@ -112,5 +114,19 @@ func TestAuthnHandlerAndSession(t *testing.T) {
 	assert.True(t, cookieFound, "Session cookie not found in response.")
 	response = httptest.NewRecorder()
 	rt.ServeHTTP(response, requestWithCookie)
-	assert.Equal(t, http.StatusNoContent, response.Code, "Expected 204 when using cookie")
+	assert.Equal(t, http.StatusNoContent, response.Code, "Expected %d when using cookie", http.StatusNoContent)
+
+	// Concurrency test
+	var wg sync.WaitGroup
+	noReq := 10
+	wg.Add(noReq)
+	for i := 0; i < noReq; i++ {
+		go func(){
+			defer wg.Done()
+			response := httptest.NewRecorder()
+			rt.ServeHTTP(response, requestWithCookie)
+			assert.Equal(t, http.StatusNoContent, response.Code, "Expected %d when using cookie", http.StatusNoContent)
+		}()
+	}
+	wg.Wait()
 }

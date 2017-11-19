@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+	"fmt"
+	"errors"
 )
 
 const (
@@ -24,7 +26,8 @@ var sessionCache authSessionCache
 var once sync.Once
 
 // GetAuthSessionCache returns a pointer to the Cache singleton.
-func GetAuthSessionCache(d time.Duration) *authSessionCache {
+// Durations is the period to wait between cache garbage collection.
+func getAuthSessionCache(d time.Duration) *authSessionCache {
 	// Create a singleton of the ReplayCache and start a background thread to regularly clean out old entries
 	once.Do(func() {
 		sessionCache = authSessionCache{
@@ -32,8 +35,8 @@ func GetAuthSessionCache(d time.Duration) *authSessionCache {
 		}
 		go func() {
 			for {
-				time.Sleep(d)
-				sessionCache.clearOldEntries(d)
+				time.Sleep(time.Duration(2) * time.Minute)
+				sessionCache.clearOldEntries()
 			}
 		}()
 	})
@@ -65,12 +68,33 @@ func setSession(w http.ResponseWriter, id goidentity.Identity, c *config.Config)
 		Path:     "/",
 	}
 	http.SetCookie(w, &cookie)
-	GetAuthSessionCache(time.Duration(c.Server.Authentication.SessionDuration)*time.Minute).addSessionEntry(sessionSecret, id, c)
+	getAuthSessionCache(time.Duration(c.Server.Authentication.SessionDuration)*time.Minute).addSessionEntry(sessionSecret, id, c)
 	return nil
 }
 
-func getSession(r *http.Request, c *config.Config) (goidentity.Identity, bool) {
-	return GetAuthSessionCache(time.Duration(c.Server.Authentication.SessionDuration)*time.Minute).validateSession(r, c)
+func getSession(r *http.Request, c *config.Config) (goidentity.Identity, bool, error) {
+	return getAuthSessionCache(time.Duration(c.Server.Authentication.SessionDuration)*time.Minute).validateSession(r, c)
+}
+
+func processSessionCookie(c *http.Cookie) (sessionID, sessionSecret string, err error) {
+	value := make(map[string]string)
+	var s = securecookie.New(hashKey, blockKey)
+	err = s.Decode(sessionCookieName, c.Value, &value)
+	if err != nil {
+		err = fmt.Errorf("error decoding session cookie: %v", err)
+		return
+	}
+	sessionID, ok := value[valueKeySessionID]
+	if !ok {
+		err = errors.New("error processing session cookie, session ID not found.")
+		return
+	}
+	sessionSecret, ok = value[valueKeySessionSecret]
+	if !ok {
+		err = errors.New("error processing session cookie, session secret not found.")
+		return
+	}
+	return
 }
 
 type authSessionCache struct {
@@ -95,7 +119,7 @@ func (a *authSessionCache) addSessionEntry(sessionSecret string, id goidentity.I
 	}
 }
 
-func (a *authSessionCache) clearOldEntries(d time.Duration) {
+func (a *authSessionCache) clearOldEntries() {
 	a.mux.Lock()
 	defer a.mux.Unlock()
 	for i, e := range a.Entries {
@@ -105,49 +129,40 @@ func (a *authSessionCache) clearOldEntries(d time.Duration) {
 	}
 }
 
-func (a *authSessionCache) validateSession(r *http.Request, c *config.Config) (id goidentity.Identity, ok bool) {
+
+func (a *authSessionCache) validateSession(r *http.Request, c *config.Config) (id goidentity.Identity, ok bool, err error) {
 	cookie, err := r.Cookie(sessionCookieName)
 	if err != nil {
-		ok = false
+		err = fmt.Errorf("session cookie not found in request: %v", err)
 		return
 	}
-	value := make(map[string]string)
-	var s = securecookie.New(hashKey, blockKey)
-	err = s.Decode(sessionCookieName, cookie.Value, &value)
+
+	// Get values of session ID and session secret provided in the request
+	rSessID, rSessSecet, err := processSessionCookie(cookie)
 	if err != nil {
-		ok = false
-		return
-	}
-	rSessionID, ok := value[valueKeySessionID]
-	if !ok {
-		ok = false
-		return
-	}
-	rSessionSecret, ok := value[valueKeySessionSecret]
-	if !ok {
-		ok = false
 		return
 	}
 
 	// Look up the session in the cache and check the SessionID and Secret pairing matches.
 	a.mux.Lock()
 	defer a.mux.Unlock()
-	e, ok := a.Entries[rSessionSecret]
+	e, ok := a.Entries[rSessSecet]
 	if !ok {
-		ok = false
+		err = errors.New("session not found in the session cache.")
 		return
 	}
 	id = e.Identity
 	if e.Expires.Before(time.Now().UTC()) || e.Timeout.Before(time.Now().UTC()) {
-		ok = false
+		err = errors.New("session found in the session cache has expired or is not yet valid.")
 		return
 	}
-	// Renew the session timeout
+	if rSessID != id.SessionID() {
+		err = errors.New("session ID in request does no match that in the session cache.")
+		return
+	}
+
+	// Session is valid. Renew the session active timeout.
 	e.Timeout = time.Now().UTC().Add(time.Minute * time.Duration(c.Server.Authentication.ActiveSessionTimeout))
-	if rSessionID != id.SessionID() {
-		ok = false
-		return
-	}
 	ok = true
 	return
 }

@@ -33,7 +33,7 @@ func AuthnHandler(inner http.Handler, c *config.Config) http.Handler {
 		}
 
 		var id goidentity.Identity
-		if sid, ok := getSession(r, c); ok {
+		if sid, ok, _ := getSession(r, c); ok {
 			// Request contains cookie for a valid session. Use ID from session cache.
 			id = sid
 			auditLine.EventType = "Authenication via session"

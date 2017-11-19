@@ -302,6 +302,8 @@ func (c *Config) logWriter(p string) (w io.Writer, err error) {
 		w = os.Stdout
 	case "stderr":
 		w = os.Stderr
+	case "null":
+		w = ioutil.Discard
 	default:
 		w, err = os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0640)
 	}
@@ -462,7 +464,7 @@ func Mock() (*Config, string) {
 		// Static basic used for testing
 		MockStaticSecret, MockStaticAttribute,
 		// Logging config
-		"stdout", "stderr", "stdout",
+		"null", "stderr", "null",
 		// Vault config
 		"secret", "https://127.0.0.1:9200", "", "", "userid", "",
 		// Database config
