@@ -2,9 +2,15 @@ package httphandling
 
 import (
 	"context"
+	"encoding/base64"
+	"github.com/gorilla/mux"
+	"github.com/jcmturner/awsfederation/config"
 	"github.com/stretchr/testify/assert"
 	goidentity "gopkg.in/jcmturner/goidentity.v1"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 func TestGetIdentity(t *testing.T) {
@@ -24,12 +30,14 @@ func TestLDAPBasicAuthenticator(t *testing.T) {
 	var l LDAPBasicAuthenticator
 	a := new(goidentity.Authenticator)
 	assert.Implements(t, a, l, "LDAPBasicAuthenticator does not implement the goidentity.Authenticator interface")
+	assert.Equal(t, "LDAP Basic", l.Mechanism(), "Mechanism string not as expected")
 }
 
 func TestStaticAuthenticator(t *testing.T) {
 	var s StaticAuthenticator
 	a := new(goidentity.Authenticator)
 	assert.Implements(t, a, s, "StaticAuthenticator does not implement the goidentity.Authenticator interface")
+	assert.Equal(t, "Static Basic", s.Mechanism(), "Mechanism string not as expected")
 }
 
 func TestParseBasicHeaderValue(t *testing.T) {
@@ -58,4 +66,51 @@ func TestParseBasicHeaderValue(t *testing.T) {
 			assert.NotNil(t, err, "invalid header did not generate error")
 		}
 	}
+}
+
+func TestAuthnHandlerAndSession(t *testing.T) {
+	// Simple inner handler func
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	})
+	c, _ := config.Mock()
+	rt := mux.NewRouter().StrictSlash(true)
+	rt.Methods("GET").
+		Path("/").
+		Name("TestAuthn").
+		Handler(AuthnHandler(inner, c))
+	request, err := http.NewRequest("GET", "/", nil)
+	if err != nil {
+		t.Fatalf("error building request: %v", err)
+	}
+	response := httptest.NewRecorder()
+	// Check call needs authentication
+	rt.ServeHTTP(response, request)
+	assert.Equal(t, http.StatusUnauthorized, response.Code, "Expected unauthorized error")
+	// Now authenticated (using testing static auth)
+	response = httptest.NewRecorder()
+	request.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte("testuser@TESTING:"+config.MockStaticSecret)))
+	rt.ServeHTTP(response, request)
+	assert.Equal(t, http.StatusNoContent, response.Code, "Expected 204")
+	resp := http.Response{Header: response.Header()}
+	cookies := resp.Cookies()
+	var cookieFound bool
+	requestWithCookie, _ := http.NewRequest("GET", "/", nil)
+	for _, cookie := range cookies {
+		if cookie.Name == sessionCookieName {
+			cookieFound = true
+			assert.True(t, cookie.HttpOnly, "Cookie not set with HttpOnly")
+			assert.True(t, cookie.Secure, "Cookie not set with secure attribute")
+			assert.NotZero(t, cookie.Value, "Value not set in cookie")
+			assert.True(t, cookie.Expires.After(time.Now().UTC()), "Cookie expires not set as expected")
+			assert.True(t, cookie.Expires.Before(time.Now().UTC().Add(time.Minute*time.Duration(c.Server.Authentication.SessionDuration))), "Cookie expires not set as expected")
+			assert.False(t, cookie.Expires.After(time.Now().UTC().Add(time.Minute*time.Duration(c.Server.Authentication.SessionDuration+1))), "Cookie expires not set as expected")
+		}
+		requestWithCookie.AddCookie(cookie)
+	}
+	assert.True(t, cookieFound, "Session cookie not found in response.")
+	response = httptest.NewRecorder()
+	rt.ServeHTTP(response, requestWithCookie)
+	assert.Equal(t, http.StatusNoContent, response.Code, "Expected 204 when using cookie")
 }

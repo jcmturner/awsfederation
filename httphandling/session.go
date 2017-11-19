@@ -6,13 +6,13 @@ import (
 	"github.com/jcmturner/awsfederation/config"
 	"gopkg.in/jcmturner/goidentity.v1"
 	"net/http"
-	"time"
 	"sync"
+	"time"
 )
 
 const (
-	sessionCookieName = "AWSFederationAuthSession"
-	valueKeySessionID = "SessionID"
+	sessionCookieName     = "AWSFederationAuthSession"
+	valueKeySessionID     = "SessionID"
 	valueKeySessionSecret = "SessionSecret"
 )
 
@@ -45,18 +45,16 @@ func setSession(w http.ResponseWriter, id goidentity.Identity, c *config.Config)
 	sessionSecret := base64.StdEncoding.EncodeToString(securecookie.GenerateRandomKey(64))
 
 	value := map[string]string{
-		valueKeySessionID: id.SessionID(),
+		valueKeySessionID:     id.SessionID(),
 		valueKeySessionSecret: sessionSecret,
 	}
 
-	maxAge := c.Server.Authentication.SessionDuration * 60
 	et := time.Now().UTC().Add(time.Minute * time.Duration(c.Server.Authentication.SessionDuration))
 
 	encoded, err := s.Encode(sessionCookieName, value)
 	if err != nil {
 		return err
 	}
-	s.MaxAge(maxAge)
 
 	cookie := http.Cookie{
 		Name:     sessionCookieName,
@@ -67,12 +65,12 @@ func setSession(w http.ResponseWriter, id goidentity.Identity, c *config.Config)
 		Path:     "/",
 	}
 	http.SetCookie(w, &cookie)
-	GetAuthSessionCache(time.Duration(c.Server.Authentication.SessionDuration) * time.Minute).addSessionEntry(sessionSecret, id, c)
+	GetAuthSessionCache(time.Duration(c.Server.Authentication.SessionDuration)*time.Minute).addSessionEntry(sessionSecret, id, c)
 	return nil
 }
 
 func getSession(r *http.Request, c *config.Config) (goidentity.Identity, bool) {
-	return GetAuthSessionCache(time.Duration(c.Server.Authentication.SessionDuration) * time.Minute).validateSession(r, c)
+	return GetAuthSessionCache(time.Duration(c.Server.Authentication.SessionDuration)*time.Minute).validateSession(r, c)
 }
 
 type authSessionCache struct {
@@ -82,8 +80,8 @@ type authSessionCache struct {
 
 type authSessionEntry struct {
 	Identity goidentity.Identity
-	Timeout time.Time
-	Expires time.Time
+	Timeout  time.Time
+	Expires  time.Time
 }
 
 // AddEntry adds an entry to the Cache.
@@ -92,8 +90,8 @@ func (a *authSessionCache) addSessionEntry(sessionSecret string, id goidentity.I
 	defer a.mux.Unlock()
 	a.Entries[sessionSecret] = authSessionEntry{
 		Identity: id,
-		Timeout: time.Now().UTC().Add(time.Minute * time.Duration(c.Server.Authentication.ActiveSessionTimeout)),
-		Expires: time.Now().UTC().Add(time.Minute * time.Duration(c.Server.Authentication.SessionDuration)),
+		Timeout:  time.Now().UTC().Add(time.Minute * time.Duration(c.Server.Authentication.ActiveSessionTimeout)),
+		Expires:  time.Now().UTC().Add(time.Minute * time.Duration(c.Server.Authentication.SessionDuration)),
 	}
 }
 
@@ -110,10 +108,6 @@ func (a *authSessionCache) clearOldEntries(d time.Duration) {
 func (a *authSessionCache) validateSession(r *http.Request, c *config.Config) (id goidentity.Identity, ok bool) {
 	cookie, err := r.Cookie(sessionCookieName)
 	if err != nil {
-		ok = false
-		return
-	}
-	if cookie.Expires.Before(time.Now().UTC()) {
 		ok = false
 		return
 	}
@@ -154,5 +148,6 @@ func (a *authSessionCache) validateSession(r *http.Request, c *config.Config) (i
 		ok = false
 		return
 	}
+	ok = true
 	return
 }
