@@ -24,6 +24,7 @@ func NewRouter(c *config.Config, stmtMap *database.StmtMap, fc *federationuser.F
 	router := mux.NewRouter().StrictSlash(true)
 	addRoutes(router, getFederationUserRoutes(c, stmtMap), c)
 	addRoutes(router, getAssumeRoleRoutes(c, stmtMap, fc), c)
+	addRoutes(router, getAccountClassRoutes(c, stmtMap), c)
 
 	return router
 }

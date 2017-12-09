@@ -1,7 +1,6 @@
 package httphandling
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/jcmturner/awsfederation/appcodes"
@@ -100,7 +99,7 @@ func getFederationUserFunc(c *config.Config) http.HandlerFunc {
 func updateFederationUserFunc(c *config.Config, stmtMap *database.StmtMap) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		a := requestToARN(r)
-		u, err := federationuser.LoadFederationUser(c, a)
+		_, err := federationuser.LoadFederationUser(c, a)
 		if err != nil {
 			if _, is404 := err.(vaultclient.ErrSecretNotFound); is404 {
 				respondGeneric(w, http.StatusNotFound, appcodes.FederationUserUnknown, "Federation user not found.")
@@ -109,7 +108,9 @@ func updateFederationUserFunc(c *config.Config, stmtMap *database.StmtMap) http.
 			respondGeneric(w, http.StatusInternalServerError, appcodes.FederationUserError, err.Error())
 			return
 		}
-		fu, err := processFederationUserPostData(r)
+		reader := io.LimitReader(r.Body, 1024)
+		defer r.Body.Close()
+		fu, err := federationuser.FederationUserFromReader(c, reader)
 		if err != nil {
 			respondGeneric(w, http.StatusBadRequest, appcodes.BadData, err.Error())
 			return
@@ -118,13 +119,12 @@ func updateFederationUserFunc(c *config.Config, stmtMap *database.StmtMap) http.
 			respondGeneric(w, http.StatusConflict, appcodes.BadData, "ARN in posted data does not match the API path")
 			return
 		}
-		u.SetCredentials(fu.Credentials.AccessKeyID, fu.Credentials.SecretAccessKey, fu.Credentials.SessionToken, fu.Credentials.Expiration, fu.TTL, fu.MFASerialNumber, fu.MFASecret)
-		err = u.Store(*stmtMap)
+		err = fu.Store(*stmtMap)
 		if err != nil {
 			respondGeneric(w, http.StatusInternalServerError, appcodes.FederationUserError, fmt.Sprintf("Error storing federation user in vault: %v", err))
 			return
 		}
-		respondGeneric(w, http.StatusOK, appcodes.Info, fmt.Sprintf("Federation user %s updated.", u.ARNString))
+		respondGeneric(w, http.StatusOK, appcodes.Info, fmt.Sprintf("Federation user %s updated.", fu.ARNString))
 		return
 	})
 }
@@ -153,24 +153,25 @@ func deleteFederationUserFunc(c *config.Config, stmtMap *database.StmtMap) http.
 
 func createFederationUserFunc(c *config.Config, stmtMap *database.StmtMap) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fu, err := processFederationUserPostData(r)
+		reader := io.LimitReader(r.Body, 1024)
+		defer r.Body.Close()
+		fu, err := federationuser.FederationUserFromReader(c, reader)
 		if err != nil {
 			respondGeneric(w, http.StatusBadRequest, appcodes.BadData, err.Error())
 			return
 		}
-		u, err := federationuser.LoadFederationUser(c, fu.ARNString)
+		_, err = federationuser.LoadFederationUser(c, fu.ARNString)
 		// Check that the federation user doesn't already exist
 		if err == nil {
 			respondGeneric(w, http.StatusConflict, appcodes.FederationUserAlreadyExists, "Federation user already exists.")
 			return
 		}
-		u.SetCredentials(fu.Credentials.AccessKeyID, fu.Credentials.SecretAccessKey, fu.Credentials.SessionToken, fu.Credentials.Expiration, fu.TTL, fu.MFASerialNumber, fu.MFASecret)
-		err = u.Store(*stmtMap)
+		err = fu.Store(*stmtMap)
 		if err != nil {
 			respondGeneric(w, http.StatusInternalServerError, appcodes.FederationUserError, fmt.Sprintf("Error storing federation user in vault: %v", err))
 			return
 		}
-		respondGeneric(w, http.StatusOK, appcodes.Info, fmt.Sprintf("Federation user %s created.", u.ARNString))
+		respondGeneric(w, http.StatusOK, appcodes.Info, fmt.Sprintf("Federation user %s created.", fu.ARNString))
 		return
 	})
 }
@@ -253,21 +254,4 @@ func getListIAMUsers(c *config.Config, accountIDs []string) ([]string, error) {
 		}
 	}
 	return iamUsers, nil
-}
-
-func processFederationUserPostData(r *http.Request) (federationuser.FederationUser, error) {
-	var data federationuser.FederationUser
-	//Set limit to reading 1MB. Probably a bit large. Prevents DOS by posting large amount of data
-	dec := json.NewDecoder(io.LimitReader(r.Body, 1024))
-	defer r.Body.Close()
-	err := dec.Decode(&data)
-	if err != nil {
-		return data, appcodes.ErrBadPostData{}.Errorf("Could not parse data posted from client (%s) to %s : %v", r.RemoteAddr, r.RequestURI, err)
-	}
-	a, err := federationuser.ValidateFederationUserARN(data.ARNString)
-	if err != nil {
-		return data, appcodes.ErrBadPostData{}.Errorf("Invalid Federation user ARN: %v", err)
-	}
-	data.ARN = a
-	return data, nil
 }

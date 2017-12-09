@@ -1,6 +1,7 @@
 package federationuser
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/jcmturner/awsfederation/arn"
@@ -8,6 +9,7 @@ import (
 	"github.com/jcmturner/awsfederation/config"
 	"github.com/jcmturner/awsfederation/database"
 	"github.com/jcmturner/awsvaultcredsprovider"
+	"io"
 	"time"
 )
 
@@ -30,20 +32,44 @@ type FederationUserList struct {
 	FederationUsers []string
 }
 
-func NewFederationUser(c *config.Config, arn string) (FederationUser, error) {
-	a, err := ValidateFederationUserARN(arn)
+func NewFederationUser(c *config.Config, arn string) (u FederationUser, err error) {
+	u.ARN, err = ValidateFederationUserARN(arn)
 	if err != nil {
-		return FederationUser{}, err
+		return
 	}
-	p, err := awsvaultcredsprovider.NewVaultCredsProvider(arn, *c.Vault.Config, *c.Vault.Credentials)
+	u.ARNString = arn
+	u.Provider, err = awsvaultcredsprovider.NewVaultCredsProvider(arn, *c.Vault.Config, *c.Vault.Credentials)
+	if err != nil {
+		err = fmt.Errorf("error creating credentials provider: %v", err)
+		return
+	}
+	return
+}
+
+func FederationUserFromReader(c *config.Config, r io.Reader) (u FederationUser, err error) {
+	dec := json.NewDecoder(r)
+	err = dec.Decode(&u)
+	if err != nil {
+		err = fmt.Errorf("error decoding JSON: %v", err)
+		return
+	}
+	u.ARN, err = ValidateFederationUserARN(u.ARNString)
+	if err != nil {
+		err = fmt.Errorf("invalid ARN: %v", err)
+		return
+	}
+	u.Provider, err = awsvaultcredsprovider.NewVaultCredsProvider(u.ARNString, *c.Vault.Config, *c.Vault.Credentials)
 	if err != nil {
 		return FederationUser{}, fmt.Errorf("Error creating credentials provider: %v", err)
 	}
-	return FederationUser{
-		ARNString: arn,
-		ARN:       a,
-		Provider:  p,
-	}, nil
+	u.Provider.SetAccessKey(u.Credentials.AccessKeyID).
+		SetSecretAccessKey(u.Credentials.SecretAccessKey).
+		SetSessionToken(u.Credentials.SessionToken).
+		SetExpiration(u.Credentials.Expiration).SetTTL(u.TTL)
+	if u.MFASerialNumber != "" && u.MFASecret != "" {
+		u.Provider.WithMFA(u.MFASerialNumber, u.MFASecret)
+	}
+	return u, nil
 }
 
 func LoadFederationUser(c *config.Config, arn string) (FederationUser, error) {
@@ -71,6 +97,7 @@ func (u *FederationUser) SetCredentials(accessKey, secretKey string, sessionToke
 	if MFASerialNumber != "" && MFASecret != "" {
 		u.Provider.WithMFA(MFASerialNumber, MFASecret)
 	}
+	u.TTL = TTL
 	u.Credentials.AccessKeyID = accessKey
 	u.Credentials.SecretAccessKey = "REDACTED"
 }
@@ -93,7 +120,7 @@ func (u *FederationUser) Store(stmtMap database.StmtMap) error {
 		return err
 	}
 	if stmt, ok := stmtMap[database.StmtKeyFedUserInsert]; ok {
-		_, err := stmt.Exec(u.ARNString)
+		_, err := stmt.Exec(u.ARNString, u.Name, u.TTL)
 		if err != nil {
 			return err
 		}

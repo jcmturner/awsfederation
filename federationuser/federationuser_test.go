@@ -56,7 +56,7 @@ func TestFederationUser_StoreLoadDelete(t *testing.T) {
 		testFedUserMFASecret1)
 
 	// Set the expected database call
-	ep[database.StmtKeyFedUserInsert].ExpectExec().WithArgs(testFedUserARN1).WillReturnResult(sqlmock.NewResult(0, 1))
+	ep[database.StmtKeyFedUserInsert].ExpectExec().WithArgs(testFedUserARN1, testFedUserName1, int64(testFedUserTTL1)).WillReturnResult(sqlmock.NewResult(0, 1))
 	err = fu.Store(*stmtMap)
 	if err != nil {
 		t.Fatalf("Error storing Federation user: %v", err)
@@ -94,7 +94,7 @@ func TestFederationUser_StoreLoadDelete(t *testing.T) {
 
 	//Store the same again
 	// Set the expected database call
-	ep[database.StmtKeyFedUserInsert].ExpectExec().WithArgs(testFedUserARN1).WillReturnResult(sqlmock.NewResult(0, 0))
+	ep[database.StmtKeyFedUserInsert].ExpectExec().WithArgs(testFedUserARN1, testFedUserName1, int64(testFedUserTTL1)).WillReturnResult(sqlmock.NewResult(0, 0))
 	err = fu.Store(*stmtMap)
 	if err != nil {
 		t.Fatalf("Error storing Federation user 2nd time: %v", err)
