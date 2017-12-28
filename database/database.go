@@ -27,6 +27,9 @@ func Statements() []Statement {
 		new(assumeRole),
 		new(federationUser),
 		new(accountClass),
+		new(accountType),
+		new(accountStatus),
+		new(role),
 	}
 	var s []Statement
 	for _, p := range ps {

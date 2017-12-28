@@ -1,15 +1,15 @@
 package database
 
 const (
-	StmtKeyAcctClassSelectList = 6
+	StmtKeyAcctClassSelectList = 16
 	QueryAcctClassSelectList   = "SELECT id, class FROM accountClass"
-	StmtKeyAcctClassSelect     = 7
+	StmtKeyAcctClassSelect     = 17
 	QueryAcctClassSelect       = "SELECT id, class FROM accountClass WHERE id = ?"
-	StmtKeyAcctClassInsert     = 8
+	StmtKeyAcctClassInsert     = 18
 	QueryAcctClassInsert       = "INSERT IGNORE INTO accountClass (class) VALUES (?)"
-	StmtKeyAcctClassDelete     = 9
-	QueryAcctClassDelete       = "DELETE FROM accountClass WHERE arn = ?"
-	StmtKeyAcctClassUpdate     = 10
+	StmtKeyAcctClassDelete     = 19
+	QueryAcctClassDelete       = "DELETE FROM accountClass WHERE id = ?"
+	StmtKeyAcctClassUpdate     = 20
 	QueryAcctClassUpdate       = "UPDATE accountClass SET class = ? WHERE id = ?"
 )
 

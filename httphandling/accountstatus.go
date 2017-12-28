@@ -1,1 +1,247 @@
 package httphandling
+
+import (
+	"encoding/json"
+	"fmt"
+	"github.com/gorilla/mux"
+	"github.com/jcmturner/awsfederation/appcodes"
+	"github.com/jcmturner/awsfederation/config"
+	"github.com/jcmturner/awsfederation/database"
+	"io"
+	"net/http"
+	"strconv"
+)
+
+const (
+	MuxVarAccountStatusID = "accountStatusID"
+)
+
+type accountStatus struct {
+	ID     int    `json:"ID,omitempty"`
+	Status string `json:"Status"`
+}
+
+type accountStatusList struct {
+	AccountStatuses []accountStatus `json:"AccountStatuses"`
+}
+
+func listAccountStatusFunc(c *config.Config, stmtMap *database.StmtMap) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if stmt, ok := (*stmtMap)[database.StmtKeyAcctStatusSelectList]; ok {
+			rows, err := stmt.Query()
+			if err != nil {
+				c.ApplicationLogf("error retrieving account statuses from database: %v", err)
+				respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
+				return
+			}
+			defer rows.Close()
+			var as accountStatusList
+			for rows.Next() {
+				var a accountStatus
+				err := rows.Scan(&a.ID, &a.Status)
+				if err != nil {
+					c.ApplicationLogf("error processing rows of account statuses from database: %v", err)
+					respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
+					return
+				}
+				as.AccountStatuses = append(as.AccountStatuses, a)
+			}
+			respondWithJSON(w, http.StatusOK, as)
+			return
+		}
+		c.ApplicationLogf("error, prepared statement for listing account statuses not found")
+		respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
+		return
+	})
+}
+
+func getAccountStatusFunc(c *config.Config, stmtMap *database.StmtMap) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, id, ok := accountStatusID(r)
+		if !ok {
+			respondGeneric(w, http.StatusBadRequest, appcodes.BadData, "status ID not in request")
+			return
+		}
+		if stmt, ok := (*stmtMap)[database.StmtKeyAcctStatusSelect]; ok {
+			var a accountStatus
+			err := stmt.QueryRow(id).Scan(&a.ID, &a.Status)
+			if err != nil {
+				c.ApplicationLogf("error processing account status from database: %v", err)
+				respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
+				return
+			}
+			respondWithJSON(w, http.StatusOK, a)
+			return
+		}
+		c.ApplicationLogf("error, prepared statement for getting an account statuses not found")
+		respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
+		return
+	})
+}
+
+func updateAccountStatusFunc(c *config.Config, stmtMap *database.StmtMap) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, i, ok := accountStatusID(r)
+		if !ok {
+			respondGeneric(w, http.StatusBadRequest, appcodes.BadData, "status ID not in request")
+			return
+		}
+		a, err := accountStatusFromRequest(c, r)
+		if err != nil || a.ID != i {
+			respondGeneric(w, http.StatusBadRequest, appcodes.BadData, "invalid post data")
+			return
+		}
+		if stmt, ok := (*stmtMap)[database.StmtKeyAcctStatusUpdate]; ok {
+			res, err := stmt.Exec(a.Status, a.ID)
+			if err != nil {
+				c.ApplicationLogf("error executing database statement for updating account status: %v", err)
+				respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
+				return
+			}
+			if i, e := res.RowsAffected(); i != 1 || e != nil {
+				c.ApplicationLogf("error unexpected result from database update of account status: expected (1) row affected, got (%d); error: %v", i, e)
+				respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, "unexpected response from databse")
+				return
+			}
+			respondGeneric(w, http.StatusOK, appcodes.Info, fmt.Sprintf("Account status %d updated.", a.ID))
+			return
+		}
+		c.ApplicationLogf("error, prepared statement for updating an account status not found")
+		respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
+		return
+	})
+}
+
+func createAccountStatusFunc(c *config.Config, stmtMap *database.StmtMap) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		a, err := accountStatusFromRequest(c, r)
+		if err != nil {
+			respondGeneric(w, http.StatusBadRequest, appcodes.BadData, "invalid post data")
+			return
+		}
+		if stmt, ok := (*stmtMap)[database.StmtKeyAcctStatusInsert]; ok {
+			res, err := stmt.Exec(a.Status)
+			if err != nil {
+				c.ApplicationLogf("error executing database statement for creating account status: %v", err)
+				respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
+				return
+			}
+			i, e := res.RowsAffected()
+			if e != nil || (i != 1 && i != 0) {
+				c.ApplicationLogf("error unexpected result from database for creating account status: expected (1) row affected, got (%d); error: %v", i, e)
+				respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, "unexpected response from databse")
+				return
+			}
+			if i == 0 {
+				respondGeneric(w, http.StatusBadRequest, appcodes.AccountStatusAlreadyExists, fmt.Sprintf("Account status with name %s already exists.", a.Status))
+				return
+			}
+			respondGeneric(w, http.StatusOK, appcodes.Info, fmt.Sprintf("Account status %s created.", a.Status))
+			return
+		}
+		c.ApplicationLogf("error, prepared statement for creating an account status not found")
+		respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
+		return
+	})
+}
+
+func deleteAccountStatusFunc(c *config.Config, stmtMap *database.StmtMap) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, id, ok := accountStatusID(r)
+		if !ok {
+			respondGeneric(w, http.StatusBadRequest, appcodes.BadData, "Account status ID not in request")
+			return
+		}
+		if stmt, ok := (*stmtMap)[database.StmtKeyAcctStatusDelete]; ok {
+			res, err := stmt.Exec(id)
+			if err != nil {
+				c.ApplicationLogf("error executing database statement for deleting account status: %v", err)
+				respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
+				return
+			}
+			i, e := res.RowsAffected()
+			if e != nil {
+				c.ApplicationLogf("error unexpected result from database for deleting account status: expected (1) row affected, got (%d); error: %v", i, e)
+				respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, "unexpected response from databse")
+				return
+			}
+			if i != 1 {
+				respondGeneric(w, http.StatusNotFound, appcodes.AccountStatusUnknown, "Account status ID not found.")
+				return
+			}
+			respondGeneric(w, http.StatusOK, appcodes.Info, fmt.Sprintf("Account status with ID %d deleted.", id))
+			return
+		}
+		c.ApplicationLogf("error, prepared statement for deleting an account status not found")
+		respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
+		return
+	})
+}
+
+func getAccountStatusRoutes(c *config.Config, stmtMap *database.StmtMap) []Route {
+	return []Route{
+		{
+			Name:           "AccountStatusAllList",
+			Method:         "GET",
+			Pattern:        "/" + APIVersion + "/accountstatus",
+			HandlerFunc:    listAccountStatusFunc(c, stmtMap),
+			Authentication: false,
+		},
+		{
+			Name:           "AccountStatusGet",
+			Method:         "GET",
+			Pattern:        "/" + APIVersion + "/accountstatus/{" + MuxVarAccountStatusID + ":[0-9]+}",
+			HandlerFunc:    getAccountStatusFunc(c, stmtMap),
+			Authentication: false,
+		},
+		{
+			Name:           "AccountStatusUpdate",
+			Method:         "PUT",
+			Pattern:        "/" + APIVersion + "/accountstatus/{" + MuxVarAccountStatusID + ":[0-9]+}",
+			HandlerFunc:    updateAccountStatusFunc(c, stmtMap),
+			Authentication: true,
+		},
+		{
+			Name:           "AccountStatusDelete",
+			Method:         "DELETE",
+			Pattern:        "/" + APIVersion + "/accountstatus/{" + MuxVarAccountStatusID + ":[0-9]+}",
+			HandlerFunc:    deleteAccountStatusFunc(c, stmtMap),
+			Authentication: true,
+		},
+		{
+			Name:           "AccountStatusCreate",
+			Method:         "POST",
+			Pattern:        "/" + APIVersion + "/accountstatus",
+			HandlerFunc:    createAccountStatusFunc(c, stmtMap),
+			Authentication: true,
+		},
+		{
+			Name:           "AccountStatusCreateNotAllowed",
+			Method:         "POST",
+			Pattern:        "/" + APIVersion + "/accountstatus/{" + MuxVarAccountStatusID + ":[0-9]+}",
+			HandlerFunc:    MethodNotAllowed(),
+			Authentication: true,
+		},
+	}
+}
+
+func accountStatusID(r *http.Request) (string, int, bool) {
+	vars := mux.Vars(r)
+	id, ok := vars[MuxVarAccountStatusID]
+	i, err := strconv.Atoi(id)
+	if err != nil {
+		return id, 0, false
+	}
+	return id, i, ok
+}
+
+func accountStatusFromRequest(c *config.Config, r *http.Request) (a accountStatus, err error) {
+	reader := io.LimitReader(r.Body, 1024)
+	defer r.Body.Close()
+	dec := json.NewDecoder(reader)
+	err = dec.Decode(&a)
+	if err != nil {
+		c.ApplicationLogf("error dcoding provided JSON into accountStatus: %v", err)
+	}
+	return
+}

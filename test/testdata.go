@@ -30,4 +30,12 @@ const (
 	AccountClassID1         = 1
 	AccountClassName2       = "accountClass2"
 	AccountClassID2         = 2
+	AccountTypeName1        = "accountClass1"
+	AccountTypeID1          = 1
+	AccountTypeName2        = "accountClass2"
+	AccountTypeID2          = 2
+	AccountStatusName1      = "accountStatus1"
+	AccountStatusID1        = 1
+	AccountStatusName2      = "accountStatus2"
+	AccountStatusID2        = 2
 )
