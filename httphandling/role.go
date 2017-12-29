@@ -40,37 +40,37 @@ func listRoleFunc(c *config.Config, stmtMap *database.StmtMap) http.HandlerFunc 
 		if ok {
 			stmtKey = database.StmtKeyRoleByAcct
 		}
-
-		if stmt, ok := (*stmtMap)[stmtKey]; ok {
-			var rows *sql.Rows
-			var err error
-			if stmtKey == database.StmtKeyRoleByAcct {
-				rows, err = stmt.Query(strings.Join(filter, ", "))
-			} else {
-				rows, err = stmt.Query()
-			}
+		if _, ok := (*stmtMap)[stmtKey]; !ok {
+			c.ApplicationLogf("error, prepared statement for listing roles not found")
+			respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
+			return
+		}
+		stmt := (*stmtMap)[stmtKey]
+		var rows *sql.Rows
+		var err error
+		if stmtKey == database.StmtKeyRoleByAcct {
+			rows, err = stmt.Query(strings.Join(filter, ", "))
+		} else {
+			rows, err = stmt.Query()
+		}
+		if err != nil {
+			c.ApplicationLogf("error retrieving roles from database: %v", err)
+			respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
+			return
+		}
+		defer rows.Close()
+		var as roleList
+		for rows.Next() {
+			var a role
+			err := rows.Scan(&a.ARN, &a.AccountID)
 			if err != nil {
-				c.ApplicationLogf("error retrieving roles from database: %v", err)
+				c.ApplicationLogf("error processing rows of roles from database: %v", err)
 				respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
 				return
 			}
-			defer rows.Close()
-			var as roleList
-			for rows.Next() {
-				var a role
-				err := rows.Scan(&a.ARN, &a.AccountID)
-				if err != nil {
-					c.ApplicationLogf("error processing rows of roles from database: %v", err)
-					respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
-					return
-				}
-				as.Roles = append(as.Roles, a)
-			}
-			respondWithJSON(w, http.StatusOK, as)
-			return
+			as.Roles = append(as.Roles, a)
 		}
-		c.ApplicationLogf("error, prepared statement for listing roles not found")
-		respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
+		respondWithJSON(w, http.StatusOK, as)
 		return
 	})
 }
@@ -82,19 +82,21 @@ func getRoleFunc(c *config.Config, stmtMap *database.StmtMap) http.HandlerFunc {
 			respondGeneric(w, http.StatusBadRequest, appcodes.BadData, err.Error())
 			return
 		}
-		if stmt, ok := (*stmtMap)[database.StmtKeyRoleSelect]; ok {
-			var a role
-			err := stmt.QueryRow(rl.ARN).Scan(&a.ARN, &a.AccountID)
-			if err != nil {
-				c.ApplicationLogf("error processing role from database: %v", err)
-				respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
-				return
-			}
-			respondWithJSON(w, http.StatusOK, a)
+		stmtKey := database.StmtKeyRoleSelect
+		if _, ok := (*stmtMap)[stmtKey]; !ok {
+			c.ApplicationLogf("error, prepared statement for getting an roles not found")
+			respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
 			return
 		}
-		c.ApplicationLogf("error, prepared statement for getting an roles not found")
-		respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
+		stmt := (*stmtMap)[stmtKey]
+		var a role
+		err = stmt.QueryRow(rl.ARN).Scan(&a.ARN, &a.AccountID)
+		if err != nil {
+			c.ApplicationLogf("error processing role from database: %v", err)
+			respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
+			return
+		}
+		respondWithJSON(w, http.StatusOK, a)
 		return
 	})
 }
@@ -106,28 +108,30 @@ func createRoleFunc(c *config.Config, stmtMap *database.StmtMap) http.HandlerFun
 			respondGeneric(w, http.StatusBadRequest, appcodes.BadData, "invalid post data")
 			return
 		}
-		if stmt, ok := (*stmtMap)[database.StmtKeyRoleInsert]; ok {
-			res, err := stmt.Exec(rl.ARN, rl.AccountID)
-			if err != nil {
-				c.ApplicationLogf("error executing database statement for creating role: %v", err)
-				respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
-				return
-			}
-			i, e := res.RowsAffected()
-			if e != nil || (i != 1 && i != 0) {
-				c.ApplicationLogf("error unexpected result from database for creating role: expected (1) row affected, got (%d); error: %v", i, e)
-				respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, "unexpected response from databse")
-				return
-			}
-			if i == 0 {
-				respondGeneric(w, http.StatusBadRequest, appcodes.RoleAlreadyExists, fmt.Sprintf("Role with ARN %s already exists.", rl.ARN))
-				return
-			}
-			respondGeneric(w, http.StatusOK, appcodes.Info, fmt.Sprintf("Role with ARN %s created.", rl.ARN))
+		stmtKey := database.StmtKeyRoleInsert
+		if _, ok := (*stmtMap)[stmtKey]; !ok {
+			c.ApplicationLogf("error, prepared statement for creating an role not found")
+			respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
 			return
 		}
-		c.ApplicationLogf("error, prepared statement for creating an role not found")
-		respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
+		stmt := (*stmtMap)[stmtKey]
+		res, err := stmt.Exec(rl.ARN, rl.AccountID)
+		if err != nil {
+			c.ApplicationLogf("error executing database statement for creating role: %v", err)
+			respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
+			return
+		}
+		i, e := res.RowsAffected()
+		if e != nil || (i != 1 && i != 0) {
+			c.ApplicationLogf("error unexpected result from database for creating role: expected (1) row affected, got (%d); error: %v", i, e)
+			respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, "unexpected response from databse")
+			return
+		}
+		if i == 0 {
+			respondGeneric(w, http.StatusBadRequest, appcodes.RoleAlreadyExists, fmt.Sprintf("Role with ARN %s already exists.", rl.ARN))
+			return
+		}
+		respondGeneric(w, http.StatusOK, appcodes.Info, fmt.Sprintf("Role with ARN %s created.", rl.ARN))
 		return
 	})
 }
@@ -139,28 +143,30 @@ func deleteRoleFunc(c *config.Config, stmtMap *database.StmtMap) http.HandlerFun
 			respondGeneric(w, http.StatusBadRequest, appcodes.BadData, err.Error())
 			return
 		}
-		if stmt, ok := (*stmtMap)[database.StmtKeyRoleDelete]; ok {
-			res, err := stmt.Exec(rl.ARN)
-			if err != nil {
-				c.ApplicationLogf("error executing database statement for deleting Role %s: %v", rl.ARN, err)
-				respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
-				return
-			}
-			i, e := res.RowsAffected()
-			if e != nil {
-				c.ApplicationLogf("error unexpected result from database for deleting role: expected (1) row affected, got (%d); error: %v", i, e)
-				respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, "unexpected response from databse")
-				return
-			}
-			if i != 1 {
-				respondGeneric(w, http.StatusNotFound, appcodes.RoleUnknown, fmt.Sprintf("Role with ARN %s not found.", rl.ARN))
-				return
-			}
-			respondGeneric(w, http.StatusOK, appcodes.Info, fmt.Sprintf("Role with ARN %s deleted.", rl.ARN))
+		stmtKey := database.StmtKeyRoleDelete
+		if _, ok := (*stmtMap)[stmtKey]; !ok {
+			c.ApplicationLogf("error, prepared statement for deleting a Role not found")
+			respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
 			return
 		}
-		c.ApplicationLogf("error, prepared statement for deleting a Role not found")
-		respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
+		stmt := (*stmtMap)[stmtKey]
+		res, err := stmt.Exec(rl.ARN)
+		if err != nil {
+			c.ApplicationLogf("error executing database statement for deleting Role %s: %v", rl.ARN, err)
+			respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
+			return
+		}
+		i, e := res.RowsAffected()
+		if e != nil {
+			c.ApplicationLogf("error unexpected result from database for deleting role: expected (1) row affected, got (%d); error: %v", i, e)
+			respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, "unexpected response from databse")
+			return
+		}
+		if i != 1 {
+			respondGeneric(w, http.StatusNotFound, appcodes.RoleUnknown, fmt.Sprintf("Role with ARN %s not found.", rl.ARN))
+			return
+		}
+		respondGeneric(w, http.StatusOK, appcodes.Info, fmt.Sprintf("Role with ARN %s deleted.", rl.ARN))
 		return
 	})
 }

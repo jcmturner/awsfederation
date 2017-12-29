@@ -27,30 +27,32 @@ type accountClassList struct {
 
 func listAccountClassFunc(c *config.Config, stmtMap *database.StmtMap) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if stmt, ok := (*stmtMap)[database.StmtKeyAcctClassSelectList]; ok {
-			rows, err := stmt.Query()
+		stmtKey := database.StmtKeyAcctClassSelectList
+		if _, ok := (*stmtMap)[stmtKey]; !ok {
+			c.ApplicationLogf("error, prepared statement for listing account classes not found")
+			respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
+			return
+		}
+		stmt := (*stmtMap)[stmtKey]
+		rows, err := stmt.Query()
+		if err != nil {
+			c.ApplicationLogf("error retrieving account classes from database: %v", err)
+			respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
+			return
+		}
+		defer rows.Close()
+		var as accountClassList
+		for rows.Next() {
+			var a accountClass
+			err := rows.Scan(&a.ID, &a.Class)
 			if err != nil {
-				c.ApplicationLogf("error retrieving account classes from database: %v", err)
+				c.ApplicationLogf("error processing rows of account classes from database: %v", err)
 				respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
 				return
 			}
-			defer rows.Close()
-			var as accountClassList
-			for rows.Next() {
-				var a accountClass
-				err := rows.Scan(&a.ID, &a.Class)
-				if err != nil {
-					c.ApplicationLogf("error processing rows of account classes from database: %v", err)
-					respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
-					return
-				}
-				as.AccountClasses = append(as.AccountClasses, a)
-			}
-			respondWithJSON(w, http.StatusOK, as)
-			return
+			as.AccountClasses = append(as.AccountClasses, a)
 		}
-		c.ApplicationLogf("error, prepared statement for listing account classes not found")
-		respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
+		respondWithJSON(w, http.StatusOK, as)
 		return
 	})
 }
@@ -62,19 +64,21 @@ func getAccountClassFunc(c *config.Config, stmtMap *database.StmtMap) http.Handl
 			respondGeneric(w, http.StatusBadRequest, appcodes.BadData, "class ID not in request")
 			return
 		}
-		if stmt, ok := (*stmtMap)[database.StmtKeyAcctClassSelect]; ok {
-			var a accountClass
-			err := stmt.QueryRow(id).Scan(&a.ID, &a.Class)
-			if err != nil {
-				c.ApplicationLogf("error processing account class from database: %v", err)
-				respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
-				return
-			}
-			respondWithJSON(w, http.StatusOK, a)
+		stmtKey := database.StmtKeyAcctClassSelect
+		if _, ok := (*stmtMap)[stmtKey]; !ok {
+			c.ApplicationLogf("error, prepared statement for getting an account classes not found")
+			respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
 			return
 		}
-		c.ApplicationLogf("error, prepared statement for getting an account classes not found")
-		respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
+		stmt := (*stmtMap)[stmtKey]
+		var a accountClass
+		err := stmt.QueryRow(id).Scan(&a.ID, &a.Class)
+		if err != nil {
+			c.ApplicationLogf("error processing account class from database: %v", err)
+			respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
+			return
+		}
+		respondWithJSON(w, http.StatusOK, a)
 		return
 	})
 }
@@ -91,23 +95,25 @@ func updateAccountClassFunc(c *config.Config, stmtMap *database.StmtMap) http.Ha
 			respondGeneric(w, http.StatusBadRequest, appcodes.BadData, "invalid post data")
 			return
 		}
-		if stmt, ok := (*stmtMap)[database.StmtKeyAcctClassUpdate]; ok {
-			res, err := stmt.Exec(a.Class, a.ID)
-			if err != nil {
-				c.ApplicationLogf("error executing database statement for updating account class: %v", err)
-				respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
-				return
-			}
-			if i, e := res.RowsAffected(); i != 1 || e != nil {
-				c.ApplicationLogf("error unexpected result from database update of account class: expected (1) row affected, got (%d); error: %v", i, e)
-				respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, "unexpected response from databse")
-				return
-			}
-			respondGeneric(w, http.StatusOK, appcodes.Info, fmt.Sprintf("Account class %d updated.", a.ID))
+		stmtKey := database.StmtKeyAcctClassUpdate
+		if _, ok := (*stmtMap)[stmtKey]; !ok {
+			c.ApplicationLogf("error, prepared statement for updating an account class not found")
+			respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
 			return
 		}
-		c.ApplicationLogf("error, prepared statement for updating an account class not found")
-		respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
+		stmt := (*stmtMap)[stmtKey]
+		res, err := stmt.Exec(a.Class, a.ID)
+		if err != nil {
+			c.ApplicationLogf("error executing database statement for updating account class: %v", err)
+			respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
+			return
+		}
+		if i, e := res.RowsAffected(); i != 1 || e != nil {
+			c.ApplicationLogf("error unexpected result from database update of account class: expected (1) row affected, got (%d); error: %v", i, e)
+			respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, "unexpected response from databse")
+			return
+		}
+		respondGeneric(w, http.StatusOK, appcodes.Info, fmt.Sprintf("Account class %d updated.", a.ID))
 		return
 	})
 }
@@ -119,28 +125,30 @@ func createAccountClassFunc(c *config.Config, stmtMap *database.StmtMap) http.Ha
 			respondGeneric(w, http.StatusBadRequest, appcodes.BadData, "invalid post data")
 			return
 		}
-		if stmt, ok := (*stmtMap)[database.StmtKeyAcctClassInsert]; ok {
-			res, err := stmt.Exec(a.Class)
-			if err != nil {
-				c.ApplicationLogf("error executing database statement for creating account class: %v", err)
-				respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
-				return
-			}
-			i, e := res.RowsAffected()
-			if e != nil || (i != 1 && i != 0) {
-				c.ApplicationLogf("error unexpected result from database for creating account class: expected (1) row affected, got (%d); error: %v", i, e)
-				respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, "unexpected response from databse")
-				return
-			}
-			if i == 0 {
-				respondGeneric(w, http.StatusBadRequest, appcodes.AccountClassAlreadyExists, fmt.Sprintf("Account class with name %s already exists.", a.Class))
-				return
-			}
-			respondGeneric(w, http.StatusOK, appcodes.Info, fmt.Sprintf("Account class %s created.", a.Class))
+		stmtKey := database.StmtKeyAcctClassInsert
+		if _, ok := (*stmtMap)[stmtKey]; !ok {
+			c.ApplicationLogf("error, prepared statement for creating an account class not found")
+			respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
 			return
 		}
-		c.ApplicationLogf("error, prepared statement for creating an account class not found")
-		respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
+		stmt := (*stmtMap)[stmtKey]
+		res, err := stmt.Exec(a.Class)
+		if err != nil {
+			c.ApplicationLogf("error executing database statement for creating account class: %v", err)
+			respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
+			return
+		}
+		i, e := res.RowsAffected()
+		if e != nil || (i != 1 && i != 0) {
+			c.ApplicationLogf("error unexpected result from database for creating account class: expected (1) row affected, got (%d); error: %v", i, e)
+			respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, "unexpected response from databse")
+			return
+		}
+		if i == 0 {
+			respondGeneric(w, http.StatusBadRequest, appcodes.AccountClassAlreadyExists, fmt.Sprintf("Account class with name %s already exists.", a.Class))
+			return
+		}
+		respondGeneric(w, http.StatusOK, appcodes.Info, fmt.Sprintf("Account class %s created.", a.Class))
 		return
 	})
 }
@@ -152,28 +160,30 @@ func deleteAccountClassFunc(c *config.Config, stmtMap *database.StmtMap) http.Ha
 			respondGeneric(w, http.StatusBadRequest, appcodes.BadData, "Account class ID not in request")
 			return
 		}
-		if stmt, ok := (*stmtMap)[database.StmtKeyAcctClassDelete]; ok {
-			res, err := stmt.Exec(id)
-			if err != nil {
-				c.ApplicationLogf("error executing database statement for deleting account class: %v", err)
-				respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
-				return
-			}
-			i, e := res.RowsAffected()
-			if e != nil {
-				c.ApplicationLogf("error unexpected result from database for deleting account class: expected (1) row affected, got (%d); error: %v", i, e)
-				respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, "unexpected response from databse")
-				return
-			}
-			if i != 1 {
-				respondGeneric(w, http.StatusNotFound, appcodes.AccountClassUnknown, "Account class ID not found.")
-				return
-			}
-			respondGeneric(w, http.StatusOK, appcodes.Info, fmt.Sprintf("Account class with ID %d deleted.", id))
+		stmtKey := database.StmtKeyAcctClassDelete
+		if _, ok := (*stmtMap)[stmtKey]; !ok {
+			c.ApplicationLogf("error, prepared statement for deleting an account class not found")
+			respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
 			return
 		}
-		c.ApplicationLogf("error, prepared statement for deleting an account class not found")
-		respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
+		stmt := (*stmtMap)[stmtKey]
+		res, err := stmt.Exec(id)
+		if err != nil {
+			c.ApplicationLogf("error executing database statement for deleting account class: %v", err)
+			respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
+			return
+		}
+		i, e := res.RowsAffected()
+		if e != nil {
+			c.ApplicationLogf("error unexpected result from database for deleting account class: expected (1) row affected, got (%d); error: %v", i, e)
+			respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, "unexpected response from databse")
+			return
+		}
+		if i != 1 {
+			respondGeneric(w, http.StatusNotFound, appcodes.AccountClassUnknown, "Account class ID not found.")
+			return
+		}
+		respondGeneric(w, http.StatusOK, appcodes.Info, fmt.Sprintf("Account class with ID %d deleted.", id))
 		return
 	})
 }

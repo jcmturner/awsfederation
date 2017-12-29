@@ -27,30 +27,32 @@ type accountStatusList struct {
 
 func listAccountStatusFunc(c *config.Config, stmtMap *database.StmtMap) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if stmt, ok := (*stmtMap)[database.StmtKeyAcctStatusSelectList]; ok {
-			rows, err := stmt.Query()
+		stmtKey := database.StmtKeyAcctStatusSelectList
+		if _, ok := (*stmtMap)[stmtKey]; !ok {
+			c.ApplicationLogf("error, prepared statement for listing account statuses not found")
+			respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
+			return
+		}
+		stmt := (*stmtMap)[stmtKey]
+		rows, err := stmt.Query()
+		if err != nil {
+			c.ApplicationLogf("error retrieving account statuses from database: %v", err)
+			respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
+			return
+		}
+		defer rows.Close()
+		var as accountStatusList
+		for rows.Next() {
+			var a accountStatus
+			err := rows.Scan(&a.ID, &a.Status)
 			if err != nil {
-				c.ApplicationLogf("error retrieving account statuses from database: %v", err)
+				c.ApplicationLogf("error processing rows of account statuses from database: %v", err)
 				respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
 				return
 			}
-			defer rows.Close()
-			var as accountStatusList
-			for rows.Next() {
-				var a accountStatus
-				err := rows.Scan(&a.ID, &a.Status)
-				if err != nil {
-					c.ApplicationLogf("error processing rows of account statuses from database: %v", err)
-					respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
-					return
-				}
-				as.AccountStatuses = append(as.AccountStatuses, a)
-			}
-			respondWithJSON(w, http.StatusOK, as)
-			return
+			as.AccountStatuses = append(as.AccountStatuses, a)
 		}
-		c.ApplicationLogf("error, prepared statement for listing account statuses not found")
-		respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
+		respondWithJSON(w, http.StatusOK, as)
 		return
 	})
 }
@@ -62,19 +64,21 @@ func getAccountStatusFunc(c *config.Config, stmtMap *database.StmtMap) http.Hand
 			respondGeneric(w, http.StatusBadRequest, appcodes.BadData, "status ID not in request")
 			return
 		}
-		if stmt, ok := (*stmtMap)[database.StmtKeyAcctStatusSelect]; ok {
-			var a accountStatus
-			err := stmt.QueryRow(id).Scan(&a.ID, &a.Status)
-			if err != nil {
-				c.ApplicationLogf("error processing account status from database: %v", err)
-				respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
-				return
-			}
-			respondWithJSON(w, http.StatusOK, a)
+		stmtKey := database.StmtKeyAcctStatusSelect
+		if _, ok := (*stmtMap)[stmtKey]; !ok {
+			c.ApplicationLogf("error, prepared statement for getting an account statuses not found")
+			respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
 			return
 		}
-		c.ApplicationLogf("error, prepared statement for getting an account statuses not found")
-		respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
+		stmt := (*stmtMap)[stmtKey]
+		var a accountStatus
+		err := stmt.QueryRow(id).Scan(&a.ID, &a.Status)
+		if err != nil {
+			c.ApplicationLogf("error processing account status from database: %v", err)
+			respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
+			return
+		}
+		respondWithJSON(w, http.StatusOK, a)
 		return
 	})
 }
@@ -91,23 +95,25 @@ func updateAccountStatusFunc(c *config.Config, stmtMap *database.StmtMap) http.H
 			respondGeneric(w, http.StatusBadRequest, appcodes.BadData, "invalid post data")
 			return
 		}
-		if stmt, ok := (*stmtMap)[database.StmtKeyAcctStatusUpdate]; ok {
-			res, err := stmt.Exec(a.Status, a.ID)
-			if err != nil {
-				c.ApplicationLogf("error executing database statement for updating account status: %v", err)
-				respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
-				return
-			}
-			if i, e := res.RowsAffected(); i != 1 || e != nil {
-				c.ApplicationLogf("error unexpected result from database update of account status: expected (1) row affected, got (%d); error: %v", i, e)
-				respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, "unexpected response from databse")
-				return
-			}
-			respondGeneric(w, http.StatusOK, appcodes.Info, fmt.Sprintf("Account status %d updated.", a.ID))
+		stmtKey := database.StmtKeyAcctStatusUpdate
+		if _, ok := (*stmtMap)[stmtKey]; !ok {
+			c.ApplicationLogf("error, prepared statement for updating an account status not found")
+			respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
 			return
 		}
-		c.ApplicationLogf("error, prepared statement for updating an account status not found")
-		respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
+		stmt := (*stmtMap)[stmtKey]
+		res, err := stmt.Exec(a.Status, a.ID)
+		if err != nil {
+			c.ApplicationLogf("error executing database statement for updating account status: %v", err)
+			respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
+			return
+		}
+		if i, e := res.RowsAffected(); i != 1 || e != nil {
+			c.ApplicationLogf("error unexpected result from database update of account status: expected (1) row affected, got (%d); error: %v", i, e)
+			respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, "unexpected response from databse")
+			return
+		}
+		respondGeneric(w, http.StatusOK, appcodes.Info, fmt.Sprintf("Account status %d updated.", a.ID))
 		return
 	})
 }
@@ -119,28 +125,30 @@ func createAccountStatusFunc(c *config.Config, stmtMap *database.StmtMap) http.H
 			respondGeneric(w, http.StatusBadRequest, appcodes.BadData, "invalid post data")
 			return
 		}
-		if stmt, ok := (*stmtMap)[database.StmtKeyAcctStatusInsert]; ok {
-			res, err := stmt.Exec(a.Status)
-			if err != nil {
-				c.ApplicationLogf("error executing database statement for creating account status: %v", err)
-				respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
-				return
-			}
-			i, e := res.RowsAffected()
-			if e != nil || (i != 1 && i != 0) {
-				c.ApplicationLogf("error unexpected result from database for creating account status: expected (1) row affected, got (%d); error: %v", i, e)
-				respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, "unexpected response from databse")
-				return
-			}
-			if i == 0 {
-				respondGeneric(w, http.StatusBadRequest, appcodes.AccountStatusAlreadyExists, fmt.Sprintf("Account status with name %s already exists.", a.Status))
-				return
-			}
-			respondGeneric(w, http.StatusOK, appcodes.Info, fmt.Sprintf("Account status %s created.", a.Status))
+		stmtKey := database.StmtKeyAcctStatusInsert
+		if _, ok := (*stmtMap)[stmtKey]; !ok {
+			c.ApplicationLogf("error, prepared statement for creating an account status not found")
+			respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
 			return
 		}
-		c.ApplicationLogf("error, prepared statement for creating an account status not found")
-		respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
+		stmt := (*stmtMap)[stmtKey]
+		res, err := stmt.Exec(a.Status)
+		if err != nil {
+			c.ApplicationLogf("error executing database statement for creating account status: %v", err)
+			respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
+			return
+		}
+		i, e := res.RowsAffected()
+		if e != nil || (i != 1 && i != 0) {
+			c.ApplicationLogf("error unexpected result from database for creating account status: expected (1) row affected, got (%d); error: %v", i, e)
+			respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, "unexpected response from databse")
+			return
+		}
+		if i == 0 {
+			respondGeneric(w, http.StatusBadRequest, appcodes.AccountStatusAlreadyExists, fmt.Sprintf("Account status with name %s already exists.", a.Status))
+			return
+		}
+		respondGeneric(w, http.StatusOK, appcodes.Info, fmt.Sprintf("Account status %s created.", a.Status))
 		return
 	})
 }
@@ -152,28 +160,30 @@ func deleteAccountStatusFunc(c *config.Config, stmtMap *database.StmtMap) http.H
 			respondGeneric(w, http.StatusBadRequest, appcodes.BadData, "Account status ID not in request")
 			return
 		}
-		if stmt, ok := (*stmtMap)[database.StmtKeyAcctStatusDelete]; ok {
-			res, err := stmt.Exec(id)
-			if err != nil {
-				c.ApplicationLogf("error executing database statement for deleting account status: %v", err)
-				respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
-				return
-			}
-			i, e := res.RowsAffected()
-			if e != nil {
-				c.ApplicationLogf("error unexpected result from database for deleting account status: expected (1) row affected, got (%d); error: %v", i, e)
-				respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, "unexpected response from databse")
-				return
-			}
-			if i != 1 {
-				respondGeneric(w, http.StatusNotFound, appcodes.AccountStatusUnknown, "Account status ID not found.")
-				return
-			}
-			respondGeneric(w, http.StatusOK, appcodes.Info, fmt.Sprintf("Account status with ID %d deleted.", id))
+		stmtKey := database.StmtKeyAcctStatusDelete
+		if _, ok := (*stmtMap)[stmtKey]; !ok {
+			c.ApplicationLogf("error, prepared statement for deleting an account status not found")
+			respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
 			return
 		}
-		c.ApplicationLogf("error, prepared statement for deleting an account status not found")
-		respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
+		stmt := (*stmtMap)[stmtKey]
+		res, err := stmt.Exec(id)
+		if err != nil {
+			c.ApplicationLogf("error executing database statement for deleting account status: %v", err)
+			respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
+			return
+		}
+		i, e := res.RowsAffected()
+		if e != nil {
+			c.ApplicationLogf("error unexpected result from database for deleting account status: expected (1) row affected, got (%d); error: %v", i, e)
+			respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, "unexpected response from databse")
+			return
+		}
+		if i != 1 {
+			respondGeneric(w, http.StatusNotFound, appcodes.AccountStatusUnknown, "Account status ID not found.")
+			return
+		}
+		respondGeneric(w, http.StatusOK, appcodes.Info, fmt.Sprintf("Account status with ID %d deleted.", id))
 		return
 	})
 }
