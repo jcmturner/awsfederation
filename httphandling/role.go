@@ -19,7 +19,8 @@ const (
 	MuxVarRoleARN       = "roleARN"
 	MuxVarRoleAccountID = "accountID"
 	IAMRoleARNFormat    = "arn:aws:iam::%s:role/%s"
-	QueryRoleAccountIDs = "accountids"
+
+	FilterAccountIDs = "accountid"
 )
 
 type role struct {
@@ -34,17 +35,17 @@ type roleList struct {
 func listRoleFunc(c *config.Config, stmtMap *database.StmtMap) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		stmtKey := database.StmtKeyRoleSelectList
-		acctList := r.URL.Query().Get(QueryRoleAccountIDs)
-		var accts []string
-		if acctList != "" {
-			accts = strings.Split(acctList, ",")
+
+		filter, ok := r.URL.Query()[FilterAccountIDs]
+		if ok {
 			stmtKey = database.StmtKeyRoleByAcct
 		}
+
 		if stmt, ok := (*stmtMap)[stmtKey]; ok {
 			var rows *sql.Rows
 			var err error
 			if stmtKey == database.StmtKeyRoleByAcct {
-				rows, err = stmt.Query(strings.Join(accts, ", "))
+				rows, err = stmt.Query(strings.Join(filter, ", "))
 			} else {
 				rows, err = stmt.Query()
 			}

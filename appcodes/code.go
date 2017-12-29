@@ -8,6 +8,7 @@ const (
 	AuthenticationError         = 4
 	ServerConfigurationError    = 5
 	DatabaseError               = 6
+	UUIDGenerationError         = 7
 	AssumeRoleError             = 10
 	FederationUserError         = 20
 	FederationUserUnknown       = 21
@@ -20,4 +21,6 @@ const (
 	AccountStatusAlreadyExists  = 52
 	RoleUnknown                 = 61
 	RoleAlreadyExists           = 62
+	RoleMappingUnknown          = 71
+	RoleMappingAlreadyExists    = 72
 )
