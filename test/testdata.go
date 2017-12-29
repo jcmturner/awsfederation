@@ -38,4 +38,6 @@ const (
 	AccountStatusID1        = 1
 	AccountStatusName2      = "accountStatus2"
 	AccountStatusID2        = 2
+	RoleARN1                = "arn:aws:iam::012345678912:role/rolename1"
+	RoleARN2                = "arn:aws:iam::234567890112:role/rolename2"
 )

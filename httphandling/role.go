@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/jcmturner/awsfederation/appcodes"
+	"github.com/jcmturner/awsfederation/arn"
 	"github.com/jcmturner/awsfederation/config"
 	"github.com/jcmturner/awsfederation/database"
 	"io"
@@ -23,7 +24,7 @@ const (
 
 type role struct {
 	ARN       string `json:"ARN"`
-	AccountID string `json:"AccountID"`
+	AccountID string `json:"AccountID,omitempty"`
 }
 
 type roleList struct {
@@ -223,13 +224,19 @@ func roleFromURL(r *http.Request) (a role, err error) {
 	return
 }
 
-func roleFromPOST(c *config.Config, r *http.Request) (a role, err error) {
+func roleFromPOST(c *config.Config, r *http.Request) (rl role, err error) {
 	reader := io.LimitReader(r.Body, 1024)
 	defer r.Body.Close()
 	dec := json.NewDecoder(reader)
-	err = dec.Decode(&a)
+	err = dec.Decode(&rl)
 	if err != nil {
-		c.ApplicationLogf("error dcoding provided JSON into role: %v", err)
+		c.ApplicationLogf("error decoding provided JSON into role: %v", err)
 	}
+	a, e := arn.Parse(rl.ARN)
+	if e != nil {
+		err = fmt.Errorf("invalid Role ARN: %s", e)
+		c.ApplicationLogf("invalid ARN [%s] in Role provided: %v", rl.ARN, err)
+	}
+	rl.AccountID = a.AccountID
 	return
 }
