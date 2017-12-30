@@ -39,10 +39,10 @@ type JSONGenericResponse struct {
 }
 
 type JSONCreatedResponse struct {
+	CreatedEntity   string
 	Message         string
 	HTTPCode        int
 	ApplicationCode int
-	CreatedEntity   string
 }
 
 func respondGeneric(w http.ResponseWriter, httpCode, appCode int, message string) {
@@ -56,10 +56,10 @@ func respondGeneric(w http.ResponseWriter, httpCode, appCode int, message string
 
 func respondCreated(w http.ResponseWriter, entity, message string) {
 	e := JSONCreatedResponse{
+		CreatedEntity:   entity,
 		Message:         message,
 		HTTPCode:        http.StatusCreated,
 		ApplicationCode: appcodes.Info,
-		CreatedEntity:   entity,
 	}
 	respondWithJSON(w, http.StatusCreated, e)
 }

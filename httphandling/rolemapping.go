@@ -134,7 +134,7 @@ func updateRoleMappingFunc(c *config.Config, stmtMap *database.StmtMap) http.Han
 			return
 		}
 		stmt := (*stmtMap)[stmtKey]
-		res, err := stmt.Exec(a.AuthzAttribute, a.Policy, a.Duration, a.SessionNameFormat, a.RoleARN)
+		res, err := stmt.Exec(a.AuthzAttribute, a.Policy, a.Duration, a.SessionNameFormat, a.RoleARN, id)
 		if err != nil {
 			c.ApplicationLogf("error executing database statement for updating Role Mapping: %v", err)
 			respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
@@ -239,21 +239,21 @@ func getRoleMappingRoutes(c *config.Config, stmtMap *database.StmtMap) []Route {
 		{
 			Name:           "RoleMappingGet",
 			Method:         "GET",
-			Pattern:        fmt.Sprintf(`/%s/rolemapping/{%s}:\w{8}-\w{4}-\w{4}-\w{4}-\w{12}`, APIVersion, MuxVarRoleUUID),
+			Pattern:        fmt.Sprintf(`/%s/rolemapping/{%s:\w{8}-\w{4}-\w{4}-\w{4}-\w{12}}`, APIVersion, MuxVarRoleUUID),
 			HandlerFunc:    getRoleMappingFunc(c, stmtMap),
 			Authentication: false,
 		},
 		{
 			Name:           "RoleMappingUpdate",
 			Method:         "PUT",
-			Pattern:        fmt.Sprintf(`/%s/rolemapping/{%s}:\w{8}-\w{4}-\w{4}-\w{4}-\w{12}`, APIVersion, MuxVarRoleUUID),
+			Pattern:        fmt.Sprintf(`/%s/rolemapping/{%s:\w{8}-\w{4}-\w{4}-\w{4}-\w{12}}`, APIVersion, MuxVarRoleUUID),
 			HandlerFunc:    updateRoleMappingFunc(c, stmtMap),
 			Authentication: true,
 		},
 		{
 			Name:           "RoleMappingDelete",
 			Method:         "DELETE",
-			Pattern:        fmt.Sprintf(`/%s/rolemapping/{%s}:\w{8}-\w{4}-\w{4}-\w{4}-\w{12}`, APIVersion, MuxVarRoleUUID),
+			Pattern:        fmt.Sprintf(`/%s/rolemapping/{%s:\w{8}-\w{4}-\w{4}-\w{4}-\w{12}}`, APIVersion, MuxVarRoleUUID),
 			HandlerFunc:    deleteRoleMappingFunc(c, stmtMap),
 			Authentication: true,
 		},
@@ -267,7 +267,7 @@ func getRoleMappingRoutes(c *config.Config, stmtMap *database.StmtMap) []Route {
 		{
 			Name:           "RoleMappingCreateNotAllowed",
 			Method:         "POST",
-			Pattern:        fmt.Sprintf(`/%s/rolemapping/{%s}:\w{8}-\w{4}-\w{4}-\w{4}-\w{12}`, APIVersion, MuxVarRoleUUID),
+			Pattern:        fmt.Sprintf(`/%s/rolemapping/{%s:\w{8}-\w{4}-\w{4}-\w{4}-\w{12}}`, APIVersion, MuxVarRoleUUID),
 			HandlerFunc:    MethodNotAllowed(),
 			Authentication: true,
 		},

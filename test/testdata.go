@@ -26,6 +26,7 @@ const (
 	IAMUser2MFASerial       = "arn:aws:iam::223456789012:mfa/test2"
 	IAMUser2MFASecret       = "V2NFI2CRKFCMZJD232ONV5OLVPN5H3ZO2553QHFPXJK4BJN4X3JBYEQ6DJSBXE7H"
 	GenericResponseTmpl     = "{\"Message\":\"%s\",\"HTTPCode\":%d,\"ApplicationCode\":%d}"
+	CreatedResponseTmpl     = "{\"CreatedEntity\":\"%s\",\"Message\":\"%s\",\"HTTPCode\":201,\"ApplicationCode\":0}"
 	AccountClassName1       = "accountClass1"
 	AccountClassID1         = 1
 	AccountClassName2       = "accountClass2"
@@ -40,4 +41,8 @@ const (
 	AccountStatusID2        = 2
 	RoleARN1                = "arn:aws:iam::012345678912:role/rolename1"
 	RoleARN2                = "arn:aws:iam::234567890112:role/rolename2"
+	AuthzAttrib1            = "myGroup1"
+	AuthzAttrib2            = "myGroup2"
+	UUID1                   = "6901e2f6-0677-4a0c-95f8-174testuuid1"
+	UUID2                   = "e1932ce8-212e-4cb1-b71c-906testuuid2"
 )
