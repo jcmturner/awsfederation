@@ -126,7 +126,7 @@ func updateAccountFunc(c *config.Config, stmtMap *database.StmtMap) http.Handler
 			respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, "unexpected response from databse")
 			return
 		}
-		respondGeneric(w, http.StatusOK, appcodes.Info, fmt.Sprintf("Account Type %d updated.", a.ID))
+		respondGeneric(w, http.StatusOK, appcodes.Info, fmt.Sprintf("Account %s updated.", a.ID))
 		return
 	})
 }
