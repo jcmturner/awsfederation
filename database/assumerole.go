@@ -1,9 +1,9 @@
 package database
 
 const (
-	StmtKeyAuthzCheck        = 1
+	StmtKeyAuthzCheck        = 50
 	QueryAuthzCheck          = "SELECT authz_attrib FROM roleMapping WHERE id =?"
-	StmtKeyRoleMappingLookup = 2
+	StmtKeyRoleMappingLookup = 51
 	QueryRoleMappingLookup   = "SELECT role.arn, federationUser.arn, duration, policy, session_name_format " +
 		"FROM roleMapping " +
 		"JOIN role ON roleMapping.role_arn = role.arn " +

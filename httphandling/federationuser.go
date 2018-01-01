@@ -14,8 +14,7 @@ import (
 )
 
 const (
-	MuxVarAccountID = "accountID"
-	MuxVarUsername  = "username"
+	MuxVarUsername = "username"
 )
 
 func listAllFederationUserFunc(c *config.Config) http.HandlerFunc {

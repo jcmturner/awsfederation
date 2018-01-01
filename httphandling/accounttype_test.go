@@ -18,8 +18,9 @@ import (
 
 const (
 	AccountTypeAPIPath  = "/%s/accounttype%s"
-	AccountTypePOSTTmpl = "{\"Type\":\"%s\",\"ClassID\":%d}"
-	AccountTypePUTTmpl  = "{\"ID\":%d,\"Type\":\"%s\",\"ClassID\":%d}"
+	AccountTypeGETTmpl  = "{\"ID\":%d,\"Type\":\"%s\",\"Class\":{\"ID\":%d}}"
+	AccountTypePOSTTmpl = "{\"Type\":\"%s\",\"Class\":{\"ID\":%d}}"
+	AccountTypePUTTmpl  = "{\"ID\":%d,\"Type\":\"%s\",\"Class\":{\"ID\":%d}}"
 )
 
 func TestAccountType(t *testing.T) {
@@ -41,12 +42,12 @@ func TestAccountType(t *testing.T) {
 		// Handle create duplicate
 		{"POST", true, "", fmt.Sprintf(AccountTypePOSTTmpl, test.AccountTypeName1, test.AccountClassID1), http.StatusBadRequest, fmt.Sprintf(test.GenericResponseTmpl, "Account Type with name "+test.AccountTypeName1+" already exists.", http.StatusBadRequest, appcodes.AccountTypeAlreadyExists)},
 		// List 1 entry
-		{"GET", false, "", "", http.StatusOK, fmt.Sprintf(`{"AccountTypes":[{"ID":%d,"Type":"%s","ClassID":%d}]}`, test.AccountTypeID1, test.AccountTypeName1, test.AccountClassID1)},
+		{"GET", false, "", "", http.StatusOK, fmt.Sprintf(`{"AccountTypes":[`+AccountTypeGETTmpl+`]}`, test.AccountTypeID1, test.AccountTypeName1, test.AccountClassID1)},
 		// Get
-		{"GET", false, "/1", "", http.StatusOK, fmt.Sprintf(`{"ID":%d,"Type":"%s","ClassID":%d}`, test.AccountTypeID1, test.AccountTypeName1, test.AccountClassID1)},
+		{"GET", false, "/1", "", http.StatusOK, fmt.Sprintf(AccountTypeGETTmpl, test.AccountTypeID1, test.AccountTypeName1, test.AccountClassID1)},
 		{"POST", true, "", fmt.Sprintf(AccountTypePOSTTmpl, test.AccountTypeName2, test.AccountClassID2), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account Type "+test.AccountTypeName2+" created.", http.StatusOK, appcodes.Info)},
 		//// List multiple
-		{"GET", false, "", "", http.StatusOK, fmt.Sprintf(`{"AccountTypes":[{"ID":%d,"Type":"%s","ClassID":%d},{"ID":%d,"Type":"%s","ClassID":%d}]}`, test.AccountTypeID1, test.AccountTypeName1, test.AccountClassID1, test.AccountTypeID2, test.AccountTypeName2, test.AccountClassID2)},
+		{"GET", false, "", "", http.StatusOK, fmt.Sprintf(`{"AccountTypes":[`+AccountTypeGETTmpl+","+AccountTypeGETTmpl+`]}`, test.AccountTypeID1, test.AccountTypeName1, test.AccountClassID1, test.AccountTypeID2, test.AccountTypeName2, test.AccountClassID2)},
 		//// Method not allowed
 		{"POST", true, "/1", fmt.Sprintf(AccountTypePOSTTmpl, "somethingelse", test.AccountClassID1), http.StatusMethodNotAllowed, fmt.Sprintf(test.GenericResponseTmpl, "The POST method cannot be performed against this part of the API", http.StatusMethodNotAllowed, appcodes.BadData)},
 		{"DELETE", true, "/2", "", http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account Type with ID 2 deleted.", http.StatusOK, appcodes.Info)},

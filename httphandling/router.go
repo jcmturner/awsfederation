@@ -28,6 +28,7 @@ func NewRouter(c *config.Config, stmtMap *database.StmtMap, fc *federationuser.F
 	addRoutes(router, getAccountTypeRoutes(c, stmtMap), c)
 	addRoutes(router, getAccountStatusRoutes(c, stmtMap), c)
 	addRoutes(router, getRoleMappingRoutes(c, stmtMap), c)
+	addRoutes(router, getAccountRoutes(c, stmtMap), c)
 
 	return router
 }

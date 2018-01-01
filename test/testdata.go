@@ -31,9 +31,9 @@ const (
 	AccountClassID1         = 1
 	AccountClassName2       = "accountClass2"
 	AccountClassID2         = 2
-	AccountTypeName1        = "accountClass1"
+	AccountTypeName1        = "accountType1"
 	AccountTypeID1          = 1
-	AccountTypeName2        = "accountClass2"
+	AccountTypeName2        = "accountType2"
 	AccountTypeID2          = 2
 	AccountStatusName1      = "accountStatus1"
 	AccountStatusID1        = 1

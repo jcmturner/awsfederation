@@ -17,9 +17,9 @@ const (
 )
 
 type accountType struct {
-	ID      int    `json:"ID,omitempty"`
-	Type    string `json:"Type"`
-	ClassID int    `json:"ClassID"`
+	ID    int          `json:"ID,omitempty"`
+	Type  string       `json:"Type"`
+	Class accountClass `json:"Class,omitempty"`
 }
 
 type accountTypeList struct {
@@ -45,7 +45,7 @@ func listAccountTypeFunc(c *config.Config, stmtMap *database.StmtMap) http.Handl
 		var as accountTypeList
 		for rows.Next() {
 			var a accountType
-			err := rows.Scan(&a.ID, &a.Type, &a.ClassID)
+			err := rows.Scan(&a.ID, &a.Type, &a.Class.ID)
 			if err != nil {
 				c.ApplicationLogf("error processing rows of account types from database: %v", err)
 				respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
@@ -73,7 +73,7 @@ func getAccountTypeFunc(c *config.Config, stmtMap *database.StmtMap) http.Handle
 		}
 		stmt := (*stmtMap)[stmtKey]
 		var a accountType
-		err := stmt.QueryRow(id).Scan(&a.ID, &a.Type, &a.ClassID)
+		err := stmt.QueryRow(id).Scan(&a.ID, &a.Type, &a.Class.ID)
 		if err != nil {
 			c.ApplicationLogf("error processing account type from database: %v", err)
 			respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
@@ -103,7 +103,7 @@ func updateAccountTypeFunc(c *config.Config, stmtMap *database.StmtMap) http.Han
 			return
 		}
 		stmt := (*stmtMap)[stmtKey]
-		res, err := stmt.Exec(a.Type, a.ID, a.ClassID)
+		res, err := stmt.Exec(a.Type, a.ID, a.Class.ID)
 		if err != nil {
 			c.ApplicationLogf("error executing database statement for updating account Type: %v", err)
 			respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
@@ -252,7 +252,7 @@ func accountTypeFromRequest(c *config.Config, r *http.Request) (a accountType, e
 	dec := json.NewDecoder(reader)
 	err = dec.Decode(&a)
 	if err != nil {
-		c.ApplicationLogf("error dcoding provided JSON into accountType: %v", err)
+		c.ApplicationLogf("error decoding provided JSON into accountType: %v", err)
 	}
 	return
 }

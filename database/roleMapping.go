@@ -1,23 +1,23 @@
 package database
 
 const (
-	StmtKeyRoleMappingSelectList = 26
+	StmtKeyRoleMappingSelectList = 70
 	QueryRoleMappingSelectList   = "SELECT id, account_id, role_arn, authz_attrib, policy, duration, session_name_format FROM roleMapping"
-	StmtKeyRoleMappingSelect     = 27
+	StmtKeyRoleMappingSelect     = 71
 	QueryRoleMappingSelect       = "SELECT id, account_id, role_arn, authz_attrib, policy, duration, session_name_format FROM roleMapping WHERE id = ?"
-	StmtKeyRoleMappingByAuthz    = 28
+	StmtKeyRoleMappingByAuthz    = 72
 	QueryRoleMappingByAuthz      = "SELECT id, account_id, role_arn, authz_attrib, policy, duration, session_name_format FROM roleMapping WHERE authz_attrib IN (?)"
-	StmtKeyRoleMappingByARN      = 29
+	StmtKeyRoleMappingByARN      = 73
 	QueryRoleMappingByARN        = "SELECT id, account_id, role_arn, authz_attrib, policy, duration, session_name_format FROM roleMapping WHERE role_arn IN (?)"
-	StmtKeyRoleMappingByAcct     = 30
+	StmtKeyRoleMappingByAcct     = 74
 	QueryRoleMappingByAcct       = "SELECT id, account_id, role_arn, authz_attrib, policy, duration, session_name_format FROM roleMapping WHERE account_id IN (?)"
-	StmtKeyRoleMappingInsert     = 31
+	StmtKeyRoleMappingInsert     = 75
 	QueryRoleMappingInsert       = "INSERT INTO roleMapping (id, account_id, role_arn, authz_attrib, policy, duration, session_name_format) VALUES (?, ?, ?, ?, ?, ?, ?)"
-	StmtKeyRoleMappingDelete     = 32
+	StmtKeyRoleMappingDelete     = 76
 	QueryRoleMappingDelete       = "DELETE FROM roleMapping WHERE id = ?"
-	StmtKeyRoleMappingIDExists   = 33
+	StmtKeyRoleMappingIDExists   = 77
 	QueryRoleMappingIDExists     = "SELECT 1 FROM roleMapping WHERE id = ? LIMIT 1"
-	StmtKeyRoleMappingUpdate     = 34
+	StmtKeyRoleMappingUpdate     = 78
 	QueryRoleMappingUpdate       = "UPDATE roleMapping SET account_id = ?, role_arn = ?, authz_attrib = ?, policy = ?, duration = ?, session_name_format = ? WHERE id = ?"
 )
 

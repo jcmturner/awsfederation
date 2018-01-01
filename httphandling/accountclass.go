@@ -18,7 +18,7 @@ const (
 
 type accountClass struct {
 	ID    int    `json:"ID,omitempty"`
-	Class string `json:"Class"`
+	Class string `json:"Class,omitempty"`
 }
 
 type accountClassList struct {

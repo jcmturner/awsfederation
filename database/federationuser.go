@@ -1,11 +1,11 @@
 package database
 
 const (
-	StmtKeyFedUserSelect = 3
+	StmtKeyFedUserSelect = 60
 	QueryFedUserSelect   = "SELECT name, ttl FROM federationUser WHERE arn = ?"
-	StmtKeyFedUserInsert = 4
+	StmtKeyFedUserInsert = 61
 	QueryFedUserInsert   = "INSERT IGNORE INTO federationUser (arn, name, ttl) VALUES (?, ?, ?)"
-	StmtKeyFedUserDelete = 5
+	StmtKeyFedUserDelete = 62
 	QueryFedUserDelete   = "DELETE FROM federationUser WHERE arn = ?"
 )
 
