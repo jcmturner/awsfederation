@@ -57,22 +57,22 @@ func TestRoleMapping(t *testing.T) {
 	}
 
 	// Set the expected database calls that are performed as part of the table tests
-	ep[database.StmtKeyRoleMappingInsert].ExpectExec().WithArgs(sqlmock.AnyArg(), test.AuthzAttrib1, "", 0, "", test.RoleARN1).WillReturnResult(sqlmock.NewResult(0, 1))
-	ep[database.StmtKeyRoleMappingInsert].ExpectExec().WithArgs(sqlmock.AnyArg(), test.AuthzAttrib1, "", 0, "", test.RoleARN1).WillReturnResult(sqlmock.NewResult(1, 0))
-	rows1 := sqlmock.NewRows([]string{"id", "authz", "policy", "duration", "sessfmt", "rolearn", "acctid"}).
-		AddRow(test.UUID1, test.AuthzAttrib1, "", 0, "", test.RoleARN1, test.AWSAccountID1)
+	ep[database.StmtKeyRoleMappingInsert].ExpectExec().WithArgs(sqlmock.AnyArg(), test.AWSAccountID1, test.RoleARN1, test.AuthzAttrib1, "", 0, "").WillReturnResult(sqlmock.NewResult(0, 1))
+	ep[database.StmtKeyRoleMappingInsert].ExpectExec().WithArgs(sqlmock.AnyArg(), test.AWSAccountID1, test.RoleARN1, test.AuthzAttrib1, "", 0, "").WillReturnResult(sqlmock.NewResult(1, 0))
+	rows1 := sqlmock.NewRows([]string{"id", "acctid", "rolearn", "authz", "policy", "duration", "sessfmt"}).
+		AddRow(test.UUID1, test.AWSAccountID1, test.RoleARN1, test.AuthzAttrib1, "", 0, "")
 	ep[database.StmtKeyRoleMappingSelectList].ExpectQuery().WillReturnRows(rows1)
-	rows1a := sqlmock.NewRows([]string{"id", "authz", "policy", "duration", "sessfmt", "rolearn", "acctid"}).
-		AddRow(test.UUID1, test.AuthzAttrib1, "", 0, "", test.RoleARN1, test.AWSAccountID1)
+	rows1a := sqlmock.NewRows([]string{"id", "acctid", "rolearn", "authz", "policy", "duration", "sessfmt"}).
+		AddRow(test.UUID1, test.AWSAccountID1, test.RoleARN1, test.AuthzAttrib1, "", 0, "")
 	ep[database.StmtKeyRoleMappingSelect].ExpectQuery().WithArgs(test.UUID1).WillReturnRows(rows1a)
-	ep[database.StmtKeyRoleMappingInsert].ExpectExec().WithArgs(sqlmock.AnyArg(), test.AuthzAttrib2, "", 0, "", test.RoleARN2).WillReturnResult(sqlmock.NewResult(1, 1))
-	rows2 := sqlmock.NewRows([]string{"id", "authz", "policy", "duration", "sessfmt", "rolearn", "acctid"}).
-		AddRow(test.UUID1, test.AuthzAttrib1, "", 0, "", test.RoleARN1, test.AWSAccountID1).
-		AddRow(test.UUID2, test.AuthzAttrib2, "", 0, "", test.RoleARN2, test.AWSAccountID2)
+	ep[database.StmtKeyRoleMappingInsert].ExpectExec().WithArgs(sqlmock.AnyArg(), test.AWSAccountID2, test.RoleARN2, test.AuthzAttrib2, "", 0, "").WillReturnResult(sqlmock.NewResult(1, 1))
+	rows2 := sqlmock.NewRows([]string{"id", "acctid", "rolearn", "authz", "policy", "duration", "sessfmt"}).
+		AddRow(test.UUID1, test.AWSAccountID1, test.RoleARN1, test.AuthzAttrib1, "", 0, "").
+		AddRow(test.UUID2, test.AWSAccountID2, test.RoleARN2, test.AuthzAttrib2, "", 0, "")
 	ep[database.StmtKeyRoleMappingSelectList].ExpectQuery().WillReturnRows(rows2)
 	ep[database.StmtKeyRoleMappingDelete].ExpectExec().WithArgs(test.UUID2).WillReturnResult(sqlmock.NewResult(0, 1))
 	ep[database.StmtKeyRoleMappingDelete].ExpectExec().WithArgs(test.UUID2).WillReturnResult(sqlmock.NewResult(0, 0))
-	ep[database.StmtKeyRoleMappingUpdate].ExpectExec().WithArgs(test.AuthzAttrib2, "", 0, "", test.RoleARN1, test.UUID1).WillReturnResult(sqlmock.NewResult(0, 1))
+	ep[database.StmtKeyRoleMappingUpdate].ExpectExec().WithArgs(test.AWSAccountID1, test.RoleARN1, test.AuthzAttrib2, "", 0, "", test.UUID1).WillReturnResult(sqlmock.NewResult(0, 1))
 
 	for _, test := range tests {
 		url := fmt.Sprintf(RoleMappingAPIPath, APIVersion, test.Path)

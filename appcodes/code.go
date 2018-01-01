@@ -19,8 +19,6 @@ const (
 	AccountTypeAlreadyExists    = 42
 	AccountStatusUnknown        = 51
 	AccountStatusAlreadyExists  = 52
-	RoleUnknown                 = 61
-	RoleAlreadyExists           = 62
-	RoleMappingUnknown          = 71
-	RoleMappingAlreadyExists    = 72
+	RoleMappingUnknown          = 61
+	RoleMappingAlreadyExists    = 62
 )

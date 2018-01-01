@@ -29,7 +29,6 @@ func Statements() []Statement {
 		new(accountClass),
 		new(accountType),
 		new(accountStatus),
-		new(role),
 		new(roleMapping),
 	}
 	var s []Statement

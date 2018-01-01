@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/hashicorp/go-uuid"
 	"github.com/jcmturner/awsfederation/appcodes"
+	"github.com/jcmturner/awsfederation/arn"
 	"github.com/jcmturner/awsfederation/config"
 	"github.com/jcmturner/awsfederation/database"
 	"io"
@@ -14,8 +15,9 @@ import (
 )
 
 const (
-	FilterAuthz = "authz"
-	FilterARN   = "arn"
+	FilterAuthz      = "authz"
+	FilterARN        = "arn"
+	FilterAccountIDs = "account"
 )
 
 type roleMapping struct {
@@ -76,7 +78,7 @@ func listRoleMappingFunc(c *config.Config, stmtMap *database.StmtMap) http.Handl
 		var as roleMappingList
 		for rows.Next() {
 			var a roleMapping
-			err := rows.Scan(&a.ID, &a.AuthzAttribute, &a.Policy, &a.Duration, &a.SessionNameFormat, &a.RoleARN, &a.AccountID)
+			err := rows.Scan(&a.ID, &a.AccountID, &a.RoleARN, &a.AuthzAttribute, &a.Policy, &a.Duration, &a.SessionNameFormat)
 			if err != nil {
 				c.ApplicationLogf("error processing rows of Role Mappings from database: %v", err)
 				respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
@@ -104,7 +106,7 @@ func getRoleMappingFunc(c *config.Config, stmtMap *database.StmtMap) http.Handle
 		}
 		stmt := (*stmtMap)[stmtKey]
 		var a roleMapping
-		err := stmt.QueryRow(id).Scan(&a.ID, &a.AuthzAttribute, &a.Policy, &a.Duration, &a.SessionNameFormat, &a.RoleARN, &a.AccountID)
+		err := stmt.QueryRow(id).Scan(&a.ID, &a.AccountID, &a.RoleARN, &a.AuthzAttribute, &a.Policy, &a.Duration, &a.SessionNameFormat)
 		if err != nil {
 			c.ApplicationLogf("error processing Role Mapping from database: %v", err)
 			respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
@@ -134,7 +136,7 @@ func updateRoleMappingFunc(c *config.Config, stmtMap *database.StmtMap) http.Han
 			return
 		}
 		stmt := (*stmtMap)[stmtKey]
-		res, err := stmt.Exec(a.AuthzAttribute, a.Policy, a.Duration, a.SessionNameFormat, a.RoleARN, id)
+		res, err := stmt.Exec(a.AccountID, a.RoleARN, a.AuthzAttribute, a.Policy, a.Duration, a.SessionNameFormat, id)
 		if err != nil {
 			c.ApplicationLogf("error executing database statement for updating Role Mapping: %v", err)
 			respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
@@ -171,7 +173,7 @@ func createRoleMappingFunc(c *config.Config, stmtMap *database.StmtMap) http.Han
 			return
 		}
 		stmt := (*stmtMap)[stmtKey]
-		res, err := stmt.Exec(a.ID, a.AuthzAttribute, a.Policy, a.Duration, a.SessionNameFormat, a.RoleARN)
+		res, err := stmt.Exec(a.ID, a.AccountID, a.RoleARN, a.AuthzAttribute, a.Policy, a.Duration, a.SessionNameFormat)
 		if err != nil {
 			c.ApplicationLogf("error executing database statement for creating Role Mapping: %v", err)
 			respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())
@@ -274,13 +276,19 @@ func getRoleMappingRoutes(c *config.Config, stmtMap *database.StmtMap) []Route {
 	}
 }
 
-func roleMappingFromPost(c *config.Config, r *http.Request) (a roleMapping, err error) {
+func roleMappingFromPost(c *config.Config, r *http.Request) (rm roleMapping, err error) {
 	reader := io.LimitReader(r.Body, 1024)
 	defer r.Body.Close()
 	dec := json.NewDecoder(reader)
-	err = dec.Decode(&a)
+	err = dec.Decode(&rm)
 	if err != nil {
-		c.ApplicationLogf("error dcoding provided JSON into roleMapping: %v", err)
+		c.ApplicationLogf("error decoding provided JSON into roleMapping: %v", err)
 	}
+	a, e := arn.Parse(rm.RoleARN)
+	if e != nil {
+		err = fmt.Errorf("invalid Role ARN: %s", e)
+		c.ApplicationLogf("invalid ARN [%s] in roleMapping provided: %v", rm.RoleARN, err)
+	}
+	rm.AccountID = a.AccountID
 	return
 }
