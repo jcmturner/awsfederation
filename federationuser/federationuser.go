@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/jcmturner/awsfederation/arn"
+	"github.com/jcmturner/awsarn"
 	"github.com/jcmturner/awsfederation/awscredential"
 	"github.com/jcmturner/awsfederation/config"
 	"github.com/jcmturner/awsfederation/database"
@@ -24,7 +24,7 @@ type FederationUser struct {
 	TTL             int64                                     `json:"TTL"`
 	MFASerialNumber string                                    `json:"MFASerialNumber"`
 	MFASecret       string                                    `json:"MFASecret"`
-	ARN             arn.ARN                                   `json:"-"`
+	ARN             awsarn.ARN                                `json:"-"`
 	Provider        *awsvaultcredsprovider.VaultCredsProvider `json:"-"`
 }
 
@@ -81,8 +81,8 @@ func LoadFederationUser(c *config.Config, arn string) (FederationUser, error) {
 	return u, err
 }
 
-func ValidateFederationUserARN(arnStr string) (arn.ARN, error) {
-	a, err := arn.Parse(arnStr)
+func ValidateFederationUserARN(arnStr string) (awsarn.ARN, error) {
+	a, err := awsarn.Parse(arnStr, nil)
 	if err != nil {
 		return a, fmt.Errorf("Problem with federation user's ARN: %v", err)
 	}

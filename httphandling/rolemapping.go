@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/hashicorp/go-uuid"
+	"github.com/jcmturner/awsarn"
 	"github.com/jcmturner/awsfederation/appcodes"
-	"github.com/jcmturner/awsfederation/arn"
 	"github.com/jcmturner/awsfederation/config"
 	"github.com/jcmturner/awsfederation/database"
 	"io"
@@ -284,7 +284,7 @@ func roleMappingFromPost(c *config.Config, r *http.Request) (rm roleMapping, err
 	if err != nil {
 		c.ApplicationLogf("error decoding provided JSON into roleMapping: %v", err)
 	}
-	a, e := arn.Parse(rm.RoleARN)
+	a, e := awsarn.Parse(rm.RoleARN, nil)
 	if e != nil {
 		err = fmt.Errorf("invalid Role ARN: %s", e)
 		c.ApplicationLogf("invalid ARN [%s] in roleMapping provided: %v", rm.RoleARN, err)

@@ -3,8 +3,8 @@ package httphandling
 import (
 	"fmt"
 	"github.com/gorilla/mux"
+	"github.com/jcmturner/awsarn"
 	"github.com/jcmturner/awsfederation/appcodes"
-	"github.com/jcmturner/awsfederation/arn"
 	"github.com/jcmturner/awsfederation/config"
 	"github.com/jcmturner/awsfederation/database"
 	"github.com/jcmturner/awsfederation/federationuser"
@@ -33,7 +33,7 @@ func listAllFederationUserFunc(c *config.Config) http.HandlerFunc {
 			if m != nil {
 				keys := m["keys"].([]interface{})
 				for _, v := range keys {
-					a, err := arn.Parse(v.(string))
+					a, err := awsarn.Parse(v.(string), nil)
 					if err == nil {
 						al = append(al, a.AccountID)
 					}
