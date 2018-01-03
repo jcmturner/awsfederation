@@ -27,6 +27,10 @@ const (
 	IAMUser2MFASecret       = "V2NFI2CRKFCMZJD232ONV5OLVPN5H3ZO2553QHFPXJK4BJN4X3JBYEQ6DJSBXE7H"
 	GenericResponseTmpl     = "{\"Message\":\"%s\",\"HTTPCode\":%d,\"ApplicationCode\":%d}"
 	CreatedResponseTmpl     = "{\"CreatedEntity\":\"%s\",\"Message\":\"%s\",\"HTTPCode\":201,\"ApplicationCode\":0}"
+	AccountName1            = "account1"
+	AccountName2            = "account2"
+	AccountEmail1           = "account1@email.com"
+	AccountEmail2           = "account2@email.com"
 	AccountClassName1       = "accountClass1"
 	AccountClassID1         = 1
 	AccountClassName2       = "accountClass2"

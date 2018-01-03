@@ -17,7 +17,7 @@ const (
 
 type account struct {
 	ID                string        `json:"ID"`
-	Email             string        `json:"Type"`
+	Email             string        `json:"Email"`
 	Name              string        `json:"Name"`
 	Type              accountType   `json:"Type"`
 	Status            accountStatus `json:"Status"`

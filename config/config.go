@@ -121,11 +121,11 @@ type Database struct {
 }
 
 type Authentication struct {
-	Kerberos Kerberos  `json:"Kerberos"`
-	Basic    BasicAuth `json:"Basic"`
-	JWT      JWT       `json:"JWT"`
-	ActiveSessionTimeout int `json:"ActiveSessionTimeout"`  // Duration in minutes
-	SessionDuration int `json:"SessionDuration"`  // Duration in minutes
+	Kerberos             Kerberos  `json:"Kerberos"`
+	Basic                BasicAuth `json:"Basic"`
+	JWT                  JWT       `json:"JWT"`
+	ActiveSessionTimeout int       `json:"ActiveSessionTimeout"` // Duration in minutes
+	SessionDuration      int       `json:"SessionDuration"`      // Duration in minutes
 }
 
 type Kerberos struct {
@@ -233,7 +233,7 @@ func Parse(b []byte) (c *Config, err error) {
 }
 
 func NewConfig() *Config {
-	dl := log.New(os.Stdout, "AWS Federation Server: ", log.Ldate|log.Ltime|log.Lshortfile)
+	dl := log.New(os.Stdout, "AWS Federation Server: ", log.Ldate|log.Ltime)
 	je := json.NewEncoder(os.Stdout)
 	return &Config{
 		Vault: Vault{
@@ -337,7 +337,7 @@ func (c *Config) SetApplicationLogFile(p string) *Config {
 		c.ApplicationLogf("could not open application log file: %v\n", err)
 	}
 	c.Server.Logging.ApplicationFile = p
-	l := log.New(w, "AWS Federation Server: ", log.Ldate|log.Ltime|log.Lshortfile)
+	l := log.New(w, "AWS Federation Server: ", log.Ldate|log.Ltime)
 	c.SetApplicationLogger(l)
 	return c
 }
@@ -395,7 +395,7 @@ func (c Config) AuditLog(v interface{}) {
 
 func (c Config) ApplicationLogf(format string, v ...interface{}) {
 	if c.Server.Logging.ApplicationLogger == nil {
-		l := log.New(os.Stdout, "AWS Federation Server: ", log.Ldate|log.Ltime|log.Lshortfile)
+		l := log.New(os.Stdout, "AWS Federation Server: ", log.Ldate|log.Ltime)
 		c.Server.Logging.ApplicationLogger = l
 	}
 	c.Server.Logging.ApplicationLogger.Printf(format, v)

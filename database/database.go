@@ -30,6 +30,7 @@ func Statements() []Statement {
 		new(accountType),
 		new(accountStatus),
 		new(roleMapping),
+		new(account),
 	}
 	var s []Statement
 	for _, p := range ps {
