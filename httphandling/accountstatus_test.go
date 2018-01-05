@@ -16,12 +16,6 @@ import (
 	"testing"
 )
 
-const (
-	AccountStatusAPIPath  = "/%s/accountstatus%s"
-	AccountStatusPOSTTmpl = "{\"Status\":\"%s\"}"
-	AccountStatusPUTTmpl  = "{\"ID\":%d,\"Status\":\"%s\"}"
-)
-
 func TestAccountStatus(t *testing.T) {
 	c, _, _, ep, stmtMap, s := test.TestEnv(t)
 	defer s.Close()

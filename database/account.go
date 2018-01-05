@@ -2,26 +2,26 @@ package database
 
 const (
 	StmtKeyAcctSelectList = 10
-	QueryAcctSelectList   = "SELECT id, email, name, " +
+	QueryAcctSelectList   = "SELECT account.id, email, name, " +
 		"accountType_id, accountType.type, " +
 		"accountClass.id, accountClass.class, " +
 		"accountStatus_id, accountStatus.status, " +
 		"federationUser_arn " +
-		"FROM account" +
+		"FROM account " +
 		"JOIN accountType ON account.accountType_id = accountType.id " +
-		"JOIN accountClass ON account.accountClass_id = accountClass.id " +
+		"JOIN accountClass ON accountType.class_id = accountClass.id " +
 		"JOIN accountStatus ON account.accountStatus_id = accountStatus.id"
 	StmtKeyAcctSelect = 11
-	QueryAcctSelect   = "SELECT id, email, name, " +
+	QueryAcctSelect   = "SELECT account.id, email, name, " +
 		"accountType_id, accountType.type, " +
 		"accountClass.id, accountClass.class, " +
 		"accountStatus_id, accountStatus.status, " +
 		"federationUser_arn " +
-		"FROM account" +
+		"FROM account " +
 		"JOIN accountType ON account.accountType_id = accountType.id " +
-		"JOIN accountClass ON account.accountClass_id = accountClass.id " +
+		"JOIN accountClass ON accountType.class_id = accountClass.id " +
 		"JOIN accountStatus ON account.accountStatus_id = accountStatus.id " +
-		"WHERE id = ?"
+		"WHERE account.id = ?"
 	StmtKeyAcctInsert = 12
 	QueryAcctInsert   = "INSERT IGNORE INTO account (id, email, name, accountType_id, accountStatus_id, federationUser_arn) VALUES (?, ?, ?, ?, ?, ?)"
 	StmtKeyAcctDelete = 13

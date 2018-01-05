@@ -404,7 +404,7 @@ func (c Config) ApplicationLogf(format string, v ...interface{}) {
 func (c Config) Summary() string {
 	return fmt.Sprintf(`AWS Federation Server Configuration:
 	Listenning Socket: %s
-	HTTP Enabled: %v
+	HTTPS Enabled: %v
 	Log Files:
 		Application: %s
 		Audit: %s
@@ -475,4 +475,19 @@ func Mock() (*Config, string) {
 		panic(fmt.Sprintf("%v: %s", err, confJSON))
 	}
 	return c, confJSON
+}
+
+func IntgTest() *Config {
+	c, _ := Mock()
+	dbs := os.Getenv("TEST_DB_SOCKET")
+	if dbs == "" {
+		dbs = "127.0.0.1:3306"
+	}
+	c.Database.ConnectionString = fmt.Sprintf("${username}:${password}@tcp(%s)/awsfederation?multiStatements=true&parseTime=true&autocommit=true&charset=utf8&timeout=90s", dbs)
+	addr := os.Getenv("TEST_VAULT_ADDR")
+	if addr == "" {
+		addr = "http://127.0.0.1:8200"
+	}
+	c.SetVault(addr, "", "6a1ab78a-0f5b-4287-9371-cca1fc70b0f1", "06ba5ac6-3d85-43df-81b5-cf56f4f4624e", "/secret/")
+	return c
 }

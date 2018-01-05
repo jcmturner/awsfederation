@@ -4,10 +4,9 @@ const (
 	StmtKeyAuthzCheck        = 50
 	QueryAuthzCheck          = "SELECT authz_attrib FROM roleMapping WHERE id =?"
 	StmtKeyRoleMappingLookup = 51
-	QueryRoleMappingLookup   = "SELECT role.arn, federationUser.arn, duration, policy, session_name_format " +
+	QueryRoleMappingLookup   = "SELECT role_arn, federationUser.arn, duration, policy, session_name_format " +
 		"FROM roleMapping " +
-		"JOIN role ON roleMapping.role_arn = role.arn " +
-		"JOIN account ON role.account_id = account.id " +
+		"JOIN account ON roleMapping.account_id = account.id " +
 		"JOIN federationUser ON account.federationUser_arn = federationUser.arn " +
 		"WHERE roleMapping.id = ?"
 )

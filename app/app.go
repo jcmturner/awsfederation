@@ -18,10 +18,21 @@ import (
 	"gopkg.in/jcmturner/gokrb5.v2/keytab"
 	"gopkg.in/ldap.v2"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"os"
 	"strings"
+	"time"
 )
+
+const (
+	appUser     = "awsfedapp"
+	letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!£%^*()[]{}<>.|"
+)
+
+var buildhash = "Not set"
+var buildtime = "Not set"
+var version = "Not set"
 
 type App struct {
 	Router        *mux.Router
@@ -30,6 +41,62 @@ type App struct {
 	DB            *sql.DB
 	PreparedStmts *database.StmtMap
 	VaultClient   *vaultclient.Client
+}
+
+func Version() (string, string, time.Time) {
+	bt, _ := time.Parse(time.RFC3339, buildtime)
+	return version, buildhash, bt
+}
+
+func generatePasswd() string {
+	b := make([]byte, 20)
+	for i := range b {
+		b[i] = letterBytes[rand.Int63()%int64(len(letterBytes))]
+	}
+	return string(b)
+}
+
+func ApplyDBSchema(c *config.Config, dbSocket, dbAdminUser, dbAdminPasswd string) error {
+	//TODO make this work with a TLS DB connection
+	//dbs := fmt.Sprintf("%s:%s@tcp(%s)/dbname?tls=skip-verify&multiStatements=true&parseTime=true&autocommit=true&charset=utf8&timeout=90s", dbAdminUser, dbAdminPasswd, dbSocket)
+	dbs := fmt.Sprintf("%s:%s@tcp(%s)/?multiStatements=true&parseTime=true&autocommit=true&charset=utf8&timeout=90s", dbAdminUser, dbAdminPasswd, dbSocket)
+	db, err := sql.Open("mysql", dbs)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	appPasswd := generatePasswd()
+	if err != nil {
+		return fmt.Errorf("could not generate random password: %v", err)
+	}
+	_, err = db.Exec(fmt.Sprintf(database.DBCreateSchemaAppUser, appUser, appPasswd, appUser))
+	if err != nil {
+		return err
+	}
+
+	// Store the database password in vault
+	cl, err := vaultclient.NewClient(c.Vault.Config, c.Vault.Credentials)
+	if err != nil {
+		return err
+	}
+	m := make(map[string]interface{})
+	m["username"] = appUser
+	m["password"] = appPasswd
+	cl.Write(c.Database.CredentialsVaultPath, m)
+
+	_, err = db.Exec(database.DBCreateTables)
+	if err != nil {
+		return err
+	}
+	bt, err := time.Parse(time.RFC3339, buildtime)
+	if err != nil {
+		return fmt.Errorf("format of buildtime set during compliation is not correct. It must confirm to RFC3339: %v", err)
+	}
+	_, err = db.Exec("INSERT INTO metadata(datetime, version, buildhash, buildtime) VALUES (?, ?, ?, ?)", time.Now().UTC(), version, buildhash, bt)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (a *App) Initialize(c *config.Config) error {
