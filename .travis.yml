@@ -4,7 +4,7 @@ go:
   - 1.9.x
   - master
 
-gobuild_args: -tags=integration -race -ldflags "-X github.com/jcmturner/awsfederation/app.version=v0.0.1 -X github.com/jcmturner/awsfederation/app.buildtime=`date -u '+%FT%TZ%z'` -X github.com/jcmturner/awsfederation/app.buildhash=`git rev-parse HEAD`"
+gobuild_args: -tags=integration -race -ldflags "-X github.com/jcmturner/awsfederation/app.version=v0.0.1 -X github.com/jcmturner/awsfederation/app.buildtime=`date -u '+%FT%TZ%:z'` -X github.com/jcmturner/awsfederation/app.buildhash=`git rev-parse HEAD`"
 
 sudo: required
 
