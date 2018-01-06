@@ -5,11 +5,13 @@ const (
 	QueryAcctStatusSelectList   = "SELECT id, status FROM accountStatus"
 	StmtKeyAcctStatusSelect     = 31
 	QueryAcctStatusSelect       = "SELECT id, status FROM accountStatus WHERE id = ?"
-	StmtKeyAcctStatusInsert     = 32
+	StmtKeyAcctStatusByName     = 32
+	QueryAcctStatusByName       = "SELECT id FROM accountStatus WHERE status = ?"
+	StmtKeyAcctStatusInsert     = 33
 	QueryAcctStatusInsert       = "INSERT IGNORE INTO accountStatus (status) VALUES (?)"
-	StmtKeyAcctStatusDelete     = 33
+	StmtKeyAcctStatusDelete     = 34
 	QueryAcctStatusDelete       = "DELETE FROM accountStatus WHERE id = ?"
-	StmtKeyAcctStatusUpdate     = 34
+	StmtKeyAcctStatusUpdate     = 35
 	QueryAcctStatusUpdate       = "UPDATE accountStatus SET status = ? WHERE id = ?"
 )
 
@@ -24,6 +26,10 @@ func (p *accountStatus) stmts() []Statement {
 		{
 			ID:    StmtKeyAcctStatusSelectList,
 			Query: QueryAcctStatusSelectList,
+		},
+		{
+			ID:    StmtKeyAcctStatusByName,
+			Query: QueryAcctStatusByName,
 		},
 		{
 			ID:    StmtKeyAcctStatusInsert,

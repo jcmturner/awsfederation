@@ -102,9 +102,6 @@ func ApplyDBSchema(c *config.Config, dbSocket, dbAdminUser, dbAdminPasswd string
 func (a *App) Initialize(c *config.Config) error {
 	a.Config = c
 
-	// Initialise the HTTP router
-	a.Router = httphandling.NewRouter(a.Config, a.PreparedStmts, a.FedUserCache)
-
 	// Initialise the Vault Client
 	vc, err := vaultclient.NewClient(c.Vault.Config, c.Vault.Credentials)
 	if err != nil {
@@ -194,6 +191,10 @@ func (a *App) Initialize(c *config.Config) error {
 	if err != nil {
 		return fmt.Errorf("error preparing database statements: %v", err)
 	}
+
+	// Initialise the HTTP router
+	a.Router = httphandling.NewRouter(a.Config, a.PreparedStmts, a.FedUserCache)
+
 	return nil
 }
 

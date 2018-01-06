@@ -86,10 +86,11 @@ func TestApp_Run(t *testing.T) {
 			// Check it was unauthorized before passing auth creds
 			assert.Equal(t, http.StatusUnauthorized, response.StatusCode, "Expected unauthorized error")
 			// Now authenticated (using testing static auth)
+			request, err = http.NewRequest(test.Method, url, strings.NewReader(test.PostPayload))
 			request.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte("testuser@TESTING:"+config.MockStaticSecret)))
 			response, err = http.DefaultClient.Do(request)
 			if err != nil {
-				t.Fatalf("error making request to %s: %v", url, err)
+				t.Fatalf("error making request to %s got response %+v: %v", url, response, err)
 			}
 		}
 		assert.Equal(t, test.HttpCode, response.StatusCode, fmt.Sprintf("Expected HTTP code: %d got: %d (%s %s)", test.HttpCode, response.StatusCode, test.Method, url))

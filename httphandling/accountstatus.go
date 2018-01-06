@@ -1,6 +1,7 @@
 package httphandling
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
@@ -128,13 +129,28 @@ func createAccountStatusFunc(c *config.Config, stmtMap *database.StmtMap) http.H
 			respondGeneric(w, http.StatusBadRequest, appcodes.BadData, "invalid post data")
 			return
 		}
-		stmtKey := database.StmtKeyAcctStatusInsert
+
+		// Check it does not already exist
+		stmtKey := database.StmtKeyAcctStatusByName
+		if _, ok := (*stmtMap)[stmtKey]; !ok {
+			c.ApplicationLogf("error, prepared statement for getting an account status by name not found")
+			respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
+			return
+		}
+		stmt := (*stmtMap)[stmtKey]
+		err = stmt.QueryRow(a.Status).Scan()
+		if err != sql.ErrNoRows {
+			respondGeneric(w, http.StatusBadRequest, appcodes.AccountStatusAlreadyExists, fmt.Sprintf("Account status with name %s already exists.", a.Status))
+			return
+		}
+
+		stmtKey = database.StmtKeyAcctStatusInsert
 		if _, ok := (*stmtMap)[stmtKey]; !ok {
 			c.ApplicationLogf("error, prepared statement for creating an account status not found")
 			respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
 			return
 		}
-		stmt := (*stmtMap)[stmtKey]
+		stmt = (*stmtMap)[stmtKey]
 		res, err := stmt.Exec(a.Status)
 		if err != nil {
 			c.ApplicationLogf("error executing database statement for creating account status: %v", err)

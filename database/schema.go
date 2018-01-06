@@ -57,7 +57,8 @@ ENGINE = InnoDB;
 CREATE TABLE IF NOT EXISTS awsfederation.accountStatus (
   id INT NOT NULL AUTO_INCREMENT,
   status VARCHAR(45) NOT NULL,
-  PRIMARY KEY (id))
+  PRIMARY KEY (id),
+  UNIQUE INDEX status_UNIQUE (status ASC))
 ENGINE = InnoDB;
 
 
