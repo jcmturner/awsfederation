@@ -15,8 +15,8 @@ before_install:
   - sudo /etc/init.d/mysql stop
   - docker pull mariadb
   - docker pull vault
-  - docker run -v /etc/localtime:/etc/localtime:ro --rm --name mariadb -e MYSQL_ROOT_PASSWORD=rootpasswd -p 3306:3306 mariadb
-  - docker run --cap-add=IPC_LOCK -v /etc/localtime:/etc/localtime:ro -e VAULT_DEV_ROOT_TOKEN_ID=roottoken -p 8200:8200 -e --rm --name %n vault
+  - docker run -d -v /etc/localtime:/etc/localtime:ro --rm --name mariadb -e MYSQL_ROOT_PASSWORD=rootpasswd -p 3306:3306 mariadb
+  - docker run -d --cap-add=IPC_LOCK -v /etc/localtime:/etc/localtime:ro -e VAULT_DEV_ROOT_TOKEN_ID=roottoken -p 8200:8200 -e --rm --name %n vault
   - sleep 5
   - curl -s -X POST -H "X-Vault-Token:roottoken" -d '{"type":"app-id"}' http://127.0.0.1:8200/v1/sys/auth/app-id
   - curl -s -X PUT -H "X-Vault-Token:roottoken" -d '{"rules":"path \"secret/*\" { policy = \"write\" }"}' http://127.0.0.1:8200/v1/sys/policy/devtest
