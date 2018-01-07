@@ -50,7 +50,7 @@ func TestAccountType(t *testing.T) {
 	}
 	// Set the expected database calls that are performed as part of the table tests
 	ep[database.StmtKeyAcctTypeByName].ExpectQuery().WithArgs(test.AccountTypeName1).WillReturnRows(sqlmock.NewRows([]string{"id"}))
-	ep[database.StmtKeyAcctTypeInsert].ExpectExec().WithArgs(test.AccountTypeName1).WillReturnResult(sqlmock.NewResult(0, 1))
+	ep[database.StmtKeyAcctTypeInsert].ExpectExec().WithArgs(test.AccountTypeName1, test.AccountClassID1).WillReturnResult(sqlmock.NewResult(0, 1))
 
 	rows := sqlmock.NewRows([]string{"id"}).AddRow(1)
 	ep[database.StmtKeyAcctTypeByName].ExpectQuery().WithArgs(test.AccountTypeName1).WillReturnRows(rows)
@@ -64,7 +64,7 @@ func TestAccountType(t *testing.T) {
 	ep[database.StmtKeyAcctTypeSelect].ExpectQuery().WithArgs(test.AccountTypeID1).WillReturnRows(rows)
 
 	ep[database.StmtKeyAcctTypeByName].ExpectQuery().WithArgs(test.AccountTypeName2).WillReturnRows(sqlmock.NewRows([]string{"id"}))
-	ep[database.StmtKeyAcctTypeInsert].ExpectExec().WithArgs(test.AccountTypeName2).WillReturnResult(sqlmock.NewResult(1, 1))
+	ep[database.StmtKeyAcctTypeInsert].ExpectExec().WithArgs(test.AccountTypeName2, test.AccountClassID2).WillReturnResult(sqlmock.NewResult(1, 1))
 
 	rows = sqlmock.NewRows([]string{"id", "type", "class_id"}).
 		AddRow(1, test.AccountTypeName1, test.AccountClassID1).

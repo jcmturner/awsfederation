@@ -199,6 +199,8 @@ func (a *App) Initialize(c *config.Config) error {
 }
 
 func (a *App) Run() (err error) {
+	v, bh, bt := Version()
+	fmt.Fprintf(os.Stderr, "AWS Federation Version Information:\nVersion:\t%s\nBuild hash:\t%s\nBuild time:\t%v\n", v, bh, bt)
 	fmt.Fprintln(os.Stderr, a.Config.Summary())
 	// Deferred clean up actions
 	//
