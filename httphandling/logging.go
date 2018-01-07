@@ -2,18 +2,18 @@ package httphandling
 
 import (
 	"encoding/json"
+	"fmt"
+	"github.com/hashicorp/go-uuid"
 	"github.com/jcmturner/awsfederation/config"
 	"net/http"
 	"net/url"
 	"time"
-	"github.com/hashicorp/go-uuid"
-	"fmt"
 )
 
 type AccessLog struct {
 	SourceIP    string        `json:"SourceIP"`
 	Username    string        `json:"Username"`
-	UserDomain   string        `json:"UserRealm"`
+	UserDomain  string        `json:"UserRealm"`
 	StatusCode  int           `json:"StatusCode"`
 	Method      string        `json:"Method"`
 	ServerHost  string        `json:"ServerHost"`
@@ -31,7 +31,7 @@ func accessLogger(inner http.Handler, c *config.Config) http.Handler {
 		l := AccessLog{
 			SourceIP:    r.RemoteAddr,
 			Username:    "-",
-			UserDomain:   "-",
+			UserDomain:  "-",
 			StatusCode:  ww.Status(),
 			Method:      r.Method,
 			ServerHost:  r.Host,
@@ -65,7 +65,7 @@ func auditLog(l config.AuditLogLine, msg string, r *http.Request, c *config.Conf
 	}
 	b, _ := json.Marshal(d)
 	l.Detail = url.QueryEscape(string(b))
-	c.AccessLog(l)
+	c.AuditLog(l)
 }
 
 func newAuditLogLine(eventType string, c *config.Config) (config.AuditLogLine, error) {

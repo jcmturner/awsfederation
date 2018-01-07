@@ -5,6 +5,7 @@ package app
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"github.com/jcmturner/awsfederation/appcodes"
 	"github.com/jcmturner/awsfederation/config"
@@ -112,6 +113,7 @@ func TestApp_Run(t *testing.T) {
 		{"DELETE", httphandling.AccountTypeAPI, true, "/3", "", http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account Type with ID 3 deleted.", http.StatusOK, appcodes.Info)},
 		{"DELETE", httphandling.AccountTypeAPI, true, "/3", "", http.StatusNotFound, fmt.Sprintf(test.GenericResponseTmpl, "Account Type ID not found.", http.StatusNotFound, appcodes.AccountTypeUnknown)},
 
+		// Federation User
 		{"POST", httphandling.FederationUserAPI, true, "", fmt.Sprintf(httphandling.FederationUserPOSTTmpl, test.FedUserName1, test.FedUserArn1, test.IAMUser1SecretAccessKey, test.IAMUser1SessionToken, test.IAMUser1Expiration, test.IAMUser1AccessKeyId, test.FedUserTTL1, test.IAMUser1MFASerial, test.IAMUser1MFASecret), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Federation user "+test.FedUserArn1+" created.", http.StatusOK, appcodes.Info)},
 		{"GET", httphandling.FederationUserAPI, false, "/" + test.FedUserArn1, "", http.StatusOK, fmt.Sprintf(httphandling.FederationUserResponseTmpl, test.FedUserArn1, test.IAMUser1Expiration, test.IAMUser1AccessKeyId, test.FedUserTTL1, test.IAMUser1MFASerial)},
 		{"GET", httphandling.FederationUserAPI, false, "", "", http.StatusOK, "{\"FederationUsers\":[\"" + test.FedUserArn1 + "\"]}"},
@@ -130,6 +132,7 @@ func TestApp_Run(t *testing.T) {
 		{"PUT", httphandling.FederationUserAPI, true, "/" + test.FedUserArn1, fmt.Sprintf(httphandling.FederationUserPOSTTmpl, test.FedUserName1, test.FedUserArn1, test.IAMUser1SecretAccessKey, test.IAMUser1SessionToken, test.IAMUser1Expiration, test.IAMUser2AccessKeyId, test.FedUserTTL1, test.IAMUser1MFASerial, test.IAMUser1MFASecret), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Federation user "+test.FedUserArn1+" updated.", http.StatusOK, appcodes.Info)},
 		{"GET", httphandling.FederationUserAPI, false, "/" + test.FedUserArn1, "", http.StatusOK, fmt.Sprintf(httphandling.FederationUserResponseTmpl, test.FedUserArn1, test.IAMUser1Expiration, test.IAMUser2AccessKeyId, test.FedUserTTL1, test.IAMUser1MFASerial)},
 
+		// Account
 		// Create
 		{"POST", httphandling.AccountAPI, true, "", fmt.Sprintf(httphandling.AccountPOSTTmpl, test.AWSAccountID1, test.AccountEmail1, test.AccountName1, test.AccountTypeID1, test.AccountStatusID1, test.FedUserArn1), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account "+test.AWSAccountID1+" created.", http.StatusOK, appcodes.Info)},
 		// Handle create duplicate

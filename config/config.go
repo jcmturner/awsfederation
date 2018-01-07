@@ -376,7 +376,7 @@ func NewTLSConfig(cert, key string) (TLS, error) {
 }
 
 func (c Config) AccessLog(v interface{}) {
-	if c.Server.Logging.AuditEncoder != nil {
+	if c.Server.Logging.AccessEncoder != nil {
 		err := c.Server.Logging.AccessEncoder.Encode(v)
 		if err != nil {
 			c.ApplicationLogf("could not log access event: %+v - Error: %v\n", err)
