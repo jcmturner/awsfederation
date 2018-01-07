@@ -24,6 +24,7 @@ func TestAccountStatus(t *testing.T) {
 
 	var tests = []struct {
 		Method         string
+		Endpoint       string
 		AuthRequired   bool
 		Path           string
 		PostPayload    string
@@ -31,21 +32,21 @@ func TestAccountStatus(t *testing.T) {
 		ResponseString string
 	}{
 		// Create
-		{"POST", true, "", fmt.Sprintf(AccountStatusPOSTTmpl, test.AccountStatusName1), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account status "+test.AccountStatusName1+" created.", http.StatusOK, appcodes.Info)},
+		{"POST", AccountStatusAPI, true, "", fmt.Sprintf(AccountStatusPOSTTmpl, test.AccountStatusName1), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account status "+test.AccountStatusName1+" created.", http.StatusOK, appcodes.Info)},
 		// Handle create duplicate
-		{"POST", true, "", fmt.Sprintf(AccountStatusPOSTTmpl, test.AccountStatusName1), http.StatusBadRequest, fmt.Sprintf(test.GenericResponseTmpl, "Account status with name "+test.AccountStatusName1+" already exists.", http.StatusBadRequest, appcodes.AccountStatusAlreadyExists)},
+		{"POST", AccountStatusAPI, true, "", fmt.Sprintf(AccountStatusPOSTTmpl, test.AccountStatusName1), http.StatusBadRequest, fmt.Sprintf(test.GenericResponseTmpl, "Account status with name "+test.AccountStatusName1+" already exists.", http.StatusBadRequest, appcodes.AccountStatusAlreadyExists)},
 		// List 1 entry
-		{"GET", false, "", "", http.StatusOK, fmt.Sprintf(`{"AccountStatuses":[{"ID":%d,"Status":"%s"}]}`, test.AccountStatusID1, test.AccountStatusName1)},
+		{"GET", AccountStatusAPI, false, "", "", http.StatusOK, fmt.Sprintf(`{"AccountStatuses":[{"ID":%d,"Status":"%s"}]}`, test.AccountStatusID1, test.AccountStatusName1)},
 		// Get
-		{"GET", false, "/1", "", http.StatusOK, fmt.Sprintf(`{"ID":%d,"Status":"%s"}`, test.AccountStatusID1, test.AccountStatusName1)},
-		{"POST", true, "", fmt.Sprintf(AccountStatusPOSTTmpl, test.AccountStatusName2), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account status "+test.AccountStatusName2+" created.", http.StatusOK, appcodes.Info)},
+		{"GET", AccountStatusAPI, false, "/1", "", http.StatusOK, fmt.Sprintf(`{"ID":%d,"Status":"%s"}`, test.AccountStatusID1, test.AccountStatusName1)},
+		{"POST", AccountStatusAPI, true, "", fmt.Sprintf(AccountStatusPOSTTmpl, test.AccountStatusName2), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account status "+test.AccountStatusName2+" created.", http.StatusOK, appcodes.Info)},
 		// List multiple
-		{"GET", false, "", "", http.StatusOK, fmt.Sprintf(`{"AccountStatuses":[{"ID":%d,"Status":"%s"},{"ID":%d,"Status":"%s"}]}`, test.AccountStatusID1, test.AccountStatusName1, test.AccountStatusID2, test.AccountStatusName2)},
+		{"GET", AccountStatusAPI, false, "", "", http.StatusOK, fmt.Sprintf(`{"AccountStatuses":[{"ID":%d,"Status":"%s"},{"ID":%d,"Status":"%s"}]}`, test.AccountStatusID1, test.AccountStatusName1, test.AccountStatusID2, test.AccountStatusName2)},
 		// Method not allowed
-		{"POST", true, "/1", fmt.Sprintf(AccountStatusPOSTTmpl, "somethingelse"), http.StatusMethodNotAllowed, fmt.Sprintf(test.GenericResponseTmpl, "The POST method cannot be performed against this part of the API", http.StatusMethodNotAllowed, appcodes.BadData)},
-		{"DELETE", true, "/2", "", http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account status with ID 2 deleted.", http.StatusOK, appcodes.Info)},
-		{"DELETE", true, "/2", "", http.StatusNotFound, fmt.Sprintf(test.GenericResponseTmpl, "Account status ID not found.", http.StatusNotFound, appcodes.AccountStatusUnknown)},
-		{"PUT", true, "/1", fmt.Sprintf(AccountStatusPUTTmpl, 1, "somethingelse"), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, fmt.Sprintf("Account status %d updated.", test.AccountStatusID1), http.StatusOK, appcodes.Info)},
+		{"POST", AccountStatusAPI, true, "/1", fmt.Sprintf(AccountStatusPOSTTmpl, "somethingelse"), http.StatusMethodNotAllowed, fmt.Sprintf(test.GenericResponseTmpl, "The POST method cannot be performed against this part of the API", http.StatusMethodNotAllowed, appcodes.BadData)},
+		{"DELETE", AccountStatusAPI, true, "/2", "", http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account status with ID 2 deleted.", http.StatusOK, appcodes.Info)},
+		{"DELETE", AccountStatusAPI, true, "/2", "", http.StatusNotFound, fmt.Sprintf(test.GenericResponseTmpl, "Account status ID not found.", http.StatusNotFound, appcodes.AccountStatusUnknown)},
+		{"PUT", AccountStatusAPI, true, "/1", fmt.Sprintf(AccountStatusPUTTmpl, 1, "somethingelse"), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, fmt.Sprintf("Account status %d updated.", test.AccountStatusID1), http.StatusOK, appcodes.Info)},
 	}
 	// Set the expected database calls that are performed as part of the table tests
 	ep[database.StmtKeyAcctStatusByName].ExpectQuery().WithArgs(test.AccountStatusName1).WillReturnRows(sqlmock.NewRows([]string{"id"}))
@@ -75,7 +76,7 @@ func TestAccountStatus(t *testing.T) {
 	ep[database.StmtKeyAcctStatusUpdate].ExpectExec().WithArgs("somethingelse", test.AccountStatusID1).WillReturnResult(sqlmock.NewResult(0, 1))
 
 	for _, test := range tests {
-		url := fmt.Sprintf(AccountStatusAPIPath, APIVersion, test.Path)
+		url := fmt.Sprintf("http://127.0.0.1:8443/%s/%s%s", APIVersion, test.Endpoint, test.Path)
 		request, err := http.NewRequest(test.Method, url, strings.NewReader(test.PostPayload))
 		if err != nil {
 			t.Fatalf("error building request: %v", err)

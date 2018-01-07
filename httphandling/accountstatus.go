@@ -15,7 +15,7 @@ import (
 
 const (
 	MuxVarAccountStatusID = "accountStatusID"
-	AccountStatusAPIPath  = "/%s/accountstatus%s"
+	AccountStatusAPI      = "accountstatus"
 	AccountStatusPOSTTmpl = "{\"Status\":\"%s\"}"
 	AccountStatusPUTTmpl  = "{\"ID\":%d,\"Status\":\"%s\"}"
 )

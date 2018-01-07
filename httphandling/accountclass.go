@@ -1,6 +1,7 @@
 package httphandling
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
@@ -14,6 +15,9 @@ import (
 
 const (
 	MuxVarAccountClassID = "accountClassID"
+	AccountClassAPI      = "accountclass"
+	AccountClassPOSTTmpl = "{\"Class\":\"%s\"}"
+	AccountClassPUTTmpl  = "{\"ID\":%d,\"Class\":\"%s\"}"
 )
 
 type accountClass struct {
@@ -125,13 +129,28 @@ func createAccountClassFunc(c *config.Config, stmtMap *database.StmtMap) http.Ha
 			respondGeneric(w, http.StatusBadRequest, appcodes.BadData, "invalid post data")
 			return
 		}
-		stmtKey := database.StmtKeyAcctClassInsert
+
+		// Check it does not already exist
+		stmtKey := database.StmtKeyAcctClassByName
+		if _, ok := (*stmtMap)[stmtKey]; !ok {
+			c.ApplicationLogf("error, prepared statement for getting an account status by name not found")
+			respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
+			return
+		}
+		stmt := (*stmtMap)[stmtKey]
+		err = stmt.QueryRow(a.Class).Scan()
+		if err != sql.ErrNoRows {
+			respondGeneric(w, http.StatusBadRequest, appcodes.AccountClassAlreadyExists, fmt.Sprintf("Account class with name %s already exists.", a.Class))
+			return
+		}
+
+		stmtKey = database.StmtKeyAcctClassInsert
 		if _, ok := (*stmtMap)[stmtKey]; !ok {
 			c.ApplicationLogf("error, prepared statement for creating an account class not found")
 			respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
 			return
 		}
-		stmt := (*stmtMap)[stmtKey]
+		stmt = (*stmtMap)[stmtKey]
 		res, err := stmt.Exec(a.Class)
 		if err != nil {
 			c.ApplicationLogf("error executing database statement for creating account class: %v", err)

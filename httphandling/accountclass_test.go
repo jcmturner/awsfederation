@@ -16,12 +16,6 @@ import (
 	"testing"
 )
 
-const (
-	AccountClassAPIPath  = "/%s/accountclass%s"
-	AccountClassPOSTTmpl = "{\"Class\":\"%s\"}"
-	AccountClassPUTTmpl  = "{\"ID\":%d,\"Class\":\"%s\"}"
-)
-
 func TestAccountClass(t *testing.T) {
 	c, _, _, ep, stmtMap, s := test.TestEnv(t)
 	defer s.Close()
@@ -30,6 +24,7 @@ func TestAccountClass(t *testing.T) {
 
 	var tests = []struct {
 		Method         string
+		Endpoint       string
 		AuthRequired   bool
 		Path           string
 		PostPayload    string
@@ -37,31 +32,38 @@ func TestAccountClass(t *testing.T) {
 		ResponseString string
 	}{
 		// Create
-		{"POST", true, "", fmt.Sprintf(AccountClassPOSTTmpl, test.AccountClassName1), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account class "+test.AccountClassName1+" created.", http.StatusOK, appcodes.Info)},
+		{"POST", AccountClassAPI, true, "", fmt.Sprintf(AccountClassPOSTTmpl, test.AccountClassName1), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account class "+test.AccountClassName1+" created.", http.StatusOK, appcodes.Info)},
 		// Handle create duplicate
-		{"POST", true, "", fmt.Sprintf(AccountClassPOSTTmpl, test.AccountClassName1), http.StatusBadRequest, fmt.Sprintf(test.GenericResponseTmpl, "Account class with name "+test.AccountClassName1+" already exists.", http.StatusBadRequest, appcodes.AccountClassAlreadyExists)},
+		{"POST", AccountClassAPI, true, "", fmt.Sprintf(AccountClassPOSTTmpl, test.AccountClassName1), http.StatusBadRequest, fmt.Sprintf(test.GenericResponseTmpl, "Account class with name "+test.AccountClassName1+" already exists.", http.StatusBadRequest, appcodes.AccountClassAlreadyExists)},
 		// List 1 entry
-		{"GET", false, "", "", http.StatusOK, fmt.Sprintf(`{"AccountClasses":[{"ID":%d,"Class":"%s"}]}`, test.AccountClassID1, test.AccountClassName1)},
+		{"GET", AccountClassAPI, false, "", "", http.StatusOK, fmt.Sprintf(`{"AccountClasses":[{"ID":%d,"Class":"%s"}]}`, test.AccountClassID1, test.AccountClassName1)},
 		// Get
-		{"GET", false, "/1", "", http.StatusOK, fmt.Sprintf(`{"ID":%d,"Class":"%s"}`, test.AccountClassID1, test.AccountClassName1)},
-		{"POST", true, "", fmt.Sprintf(AccountClassPOSTTmpl, test.AccountClassName2), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account class "+test.AccountClassName2+" created.", http.StatusOK, appcodes.Info)},
+		{"GET", AccountClassAPI, false, "/1", "", http.StatusOK, fmt.Sprintf(`{"ID":%d,"Class":"%s"}`, test.AccountClassID1, test.AccountClassName1)},
+		{"POST", AccountClassAPI, true, "", fmt.Sprintf(AccountClassPOSTTmpl, test.AccountClassName2), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account class "+test.AccountClassName2+" created.", http.StatusOK, appcodes.Info)},
 		//// List multiple
-		{"GET", false, "", "", http.StatusOK, fmt.Sprintf(`{"AccountClasses":[{"ID":%d,"Class":"%s"},{"ID":%d,"Class":"%s"}]}`, test.AccountClassID1, test.AccountClassName1, test.AccountClassID2, test.AccountClassName2)},
+		{"GET", AccountClassAPI, false, "", "", http.StatusOK, fmt.Sprintf(`{"AccountClasses":[{"ID":%d,"Class":"%s"},{"ID":%d,"Class":"%s"}]}`, test.AccountClassID1, test.AccountClassName1, test.AccountClassID2, test.AccountClassName2)},
 		//// Method not allowed
-		{"POST", true, "/1", fmt.Sprintf(AccountClassPOSTTmpl, "somethingelse"), http.StatusMethodNotAllowed, fmt.Sprintf(test.GenericResponseTmpl, "The POST method cannot be performed against this part of the API", http.StatusMethodNotAllowed, appcodes.BadData)},
-		{"DELETE", true, "/2", "", http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account class with ID 2 deleted.", http.StatusOK, appcodes.Info)},
-		{"DELETE", true, "/2", "", http.StatusNotFound, fmt.Sprintf(test.GenericResponseTmpl, "Account class ID not found.", http.StatusNotFound, appcodes.AccountClassUnknown)},
-		{"PUT", true, "/1", fmt.Sprintf(AccountClassPUTTmpl, 1, "somethingelse"), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, fmt.Sprintf("Account class %d updated.", test.AccountClassID1), http.StatusOK, appcodes.Info)},
+		{"POST", AccountClassAPI, true, "/1", fmt.Sprintf(AccountClassPOSTTmpl, "somethingelse"), http.StatusMethodNotAllowed, fmt.Sprintf(test.GenericResponseTmpl, "The POST method cannot be performed against this part of the API", http.StatusMethodNotAllowed, appcodes.BadData)},
+		{"DELETE", AccountClassAPI, true, "/2", "", http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account class with ID 2 deleted.", http.StatusOK, appcodes.Info)},
+		{"DELETE", AccountClassAPI, true, "/2", "", http.StatusNotFound, fmt.Sprintf(test.GenericResponseTmpl, "Account class ID not found.", http.StatusNotFound, appcodes.AccountClassUnknown)},
+		{"PUT", AccountClassAPI, true, "/1", fmt.Sprintf(AccountClassPUTTmpl, 1, "somethingelse"), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, fmt.Sprintf("Account class %d updated.", test.AccountClassID1), http.StatusOK, appcodes.Info)},
 	}
 	// Set the expected database calls that are performed as part of the table tests
+	ep[database.StmtKeyAcctClassByName].ExpectQuery().WithArgs(test.AccountClassName1).WillReturnRows(sqlmock.NewRows([]string{"id"}))
 	ep[database.StmtKeyAcctClassInsert].ExpectExec().WithArgs(test.AccountClassName1).WillReturnResult(sqlmock.NewResult(0, 1))
-	ep[database.StmtKeyAcctClassInsert].ExpectExec().WithArgs(test.AccountClassName1).WillReturnResult(sqlmock.NewResult(1, 0))
-	rows1 := sqlmock.NewRows([]string{"id", "class"}).
+
+	rows := sqlmock.NewRows([]string{"id"}).AddRow(1)
+	ep[database.StmtKeyAcctClassByName].ExpectQuery().WithArgs(test.AccountClassName1).WillReturnRows(rows)
+
+	rows = sqlmock.NewRows([]string{"id", "class"}).
 		AddRow(1, test.AccountClassName1)
-	ep[database.StmtKeyAcctClassSelectList].ExpectQuery().WillReturnRows(rows1)
-	rows1a := sqlmock.NewRows([]string{"id", "class"}).
+	ep[database.StmtKeyAcctClassSelectList].ExpectQuery().WillReturnRows(rows)
+
+	rows = sqlmock.NewRows([]string{"id", "class"}).
 		AddRow(1, test.AccountClassName1)
-	ep[database.StmtKeyAcctClassSelect].ExpectQuery().WithArgs(test.AccountClassID1).WillReturnRows(rows1a)
+	ep[database.StmtKeyAcctClassSelect].ExpectQuery().WithArgs(test.AccountClassID1).WillReturnRows(rows)
+
+	ep[database.StmtKeyAcctClassByName].ExpectQuery().WithArgs(test.AccountClassName2).WillReturnRows(sqlmock.NewRows([]string{"id"}))
 	ep[database.StmtKeyAcctClassInsert].ExpectExec().WithArgs(test.AccountClassName2).WillReturnResult(sqlmock.NewResult(1, 1))
 	rows2 := sqlmock.NewRows([]string{"id", "class"}).
 		AddRow(1, test.AccountClassName1).
@@ -72,7 +74,7 @@ func TestAccountClass(t *testing.T) {
 	ep[database.StmtKeyAcctClassUpdate].ExpectExec().WithArgs("somethingelse", test.AccountClassID1).WillReturnResult(sqlmock.NewResult(0, 1))
 
 	for _, test := range tests {
-		url := fmt.Sprintf(AccountClassAPIPath, APIVersion, test.Path)
+		url := fmt.Sprintf("http://127.0.0.1:8443/%s/%s%s", APIVersion, test.Endpoint, test.Path)
 		request, err := http.NewRequest(test.Method, url, strings.NewReader(test.PostPayload))
 		if err != nil {
 			t.Fatalf("error building request: %v", err)

@@ -5,11 +5,13 @@ const (
 	QueryAcctClassSelectList   = "SELECT id, class FROM accountClass"
 	StmtKeyAcctClassSelect     = 21
 	QueryAcctClassSelect       = "SELECT id, class FROM accountClass WHERE id = ?"
-	StmtKeyAcctClassInsert     = 22
+	StmtKeyAcctClassByName     = 22
+	QueryAcctClassByName       = "SELECT id FROM accountClass WHERE class = ?"
+	StmtKeyAcctClassInsert     = 23
 	QueryAcctClassInsert       = "INSERT IGNORE INTO accountClass (class) VALUES (?)"
-	StmtKeyAcctClassDelete     = 23
+	StmtKeyAcctClassDelete     = 24
 	QueryAcctClassDelete       = "DELETE FROM accountClass WHERE id = ?"
-	StmtKeyAcctClassUpdate     = 24
+	StmtKeyAcctClassUpdate     = 25
 	QueryAcctClassUpdate       = "UPDATE accountClass SET class = ? WHERE id = ?"
 )
 
@@ -24,6 +26,10 @@ func (p *accountClass) stmts() []Statement {
 		{
 			ID:    StmtKeyAcctClassSelectList,
 			Query: QueryAcctClassSelectList,
+		},
+		{
+			ID:    StmtKeyAcctClassByName,
+			Query: QueryAcctClassByName,
 		},
 		{
 			ID:    StmtKeyAcctClassInsert,
