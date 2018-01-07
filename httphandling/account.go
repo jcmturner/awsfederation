@@ -1,6 +1,7 @@
 package httphandling
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
@@ -13,6 +14,9 @@ import (
 
 const (
 	MuxVarAccountID = "accountID"
+	AccountAPI      = "account"
+	AccountGETTmpl  = "{\"ID\":\"%s\",\"Email\":\"%s\",\"Name\":\"%s\",\"Type\":{\"ID\":%d,\"Type\":\"%s\",\"Class\":{\"ID\":%d,\"Class\":\"%s\"}},\"Status\":{\"ID\":%d,\"Status\":\"%s\"},\"FederationUserARN\":\"%s\"}"
+	AccountPOSTTmpl = "{\"ID\":\"%s\",\"Email\":\"%s\",\"Name\":\"%s\",\"Type\":{\"ID\":%d},\"Status\":{\"ID\":%d},\"FederationUserARN\":\"%s\"}"
 )
 
 type account struct {
@@ -138,13 +142,28 @@ func createAccountFunc(c *config.Config, stmtMap *database.StmtMap) http.Handler
 			respondGeneric(w, http.StatusBadRequest, appcodes.BadData, "invalid post data")
 			return
 		}
-		stmtKey := database.StmtKeyAcctInsert
+
+		// Check it does not already exist
+		stmtKey := database.StmtKeyAcctCheckUnique
+		if _, ok := (*stmtMap)[stmtKey]; !ok {
+			c.ApplicationLogf("error, prepared statement for getting an account status by name not found")
+			respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
+			return
+		}
+		stmt := (*stmtMap)[stmtKey]
+		err = stmt.QueryRow(a.ID, a.Email, a.Name).Scan()
+		if err != sql.ErrNoRows {
+			respondGeneric(w, http.StatusBadRequest, appcodes.AccountAlreadyExists, fmt.Sprintf("An Account with either the ID %s, email %s or name %s already exists.", a.ID, a.Email, a.Name))
+			return
+		}
+
+		stmtKey = database.StmtKeyAcctInsert
 		if _, ok := (*stmtMap)[stmtKey]; !ok {
 			c.ApplicationLogf("error, prepared statement for creating an account not found")
 			respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
 			return
 		}
-		stmt := (*stmtMap)[stmtKey]
+		stmt = (*stmtMap)[stmtKey]
 		res, err := stmt.Exec(a.ID, a.Email, a.Name, a.Type.ID, a.Status.ID, a.FederationUserARN)
 		if err != nil {
 			c.ApplicationLogf("error executing database statement for creating account: %v", err)
@@ -158,7 +177,7 @@ func createAccountFunc(c *config.Config, stmtMap *database.StmtMap) http.Handler
 			return
 		}
 		if i == 0 {
-			respondGeneric(w, http.StatusBadRequest, appcodes.AccountAlreadyExists, fmt.Sprintf("Account with ID %s already exists.", a.ID))
+			respondGeneric(w, http.StatusBadRequest, appcodes.AccountAlreadyExists, fmt.Sprintf("Creating new account with ID %s failed.", a.ID))
 			return
 		}
 		respondGeneric(w, http.StatusOK, appcodes.Info, fmt.Sprintf("Account %s created.", a.ID))

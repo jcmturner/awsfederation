@@ -22,12 +22,14 @@ const (
 		"JOIN accountClass ON accountType.class_id = accountClass.id " +
 		"JOIN accountStatus ON account.accountStatus_id = accountStatus.id " +
 		"WHERE account.id = ?"
-	StmtKeyAcctInsert = 12
-	QueryAcctInsert   = "INSERT IGNORE INTO account (id, email, name, accountType_id, accountStatus_id, federationUser_arn) VALUES (?, ?, ?, ?, ?, ?)"
-	StmtKeyAcctDelete = 13
-	QueryAcctDelete   = "DELETE FROM account WHERE id = ?"
-	StmtKeyAcctUpdate = 14
-	QueryAcctUpdate   = "UPDATE account SET email = ?, name = ?, accountType_id = ?, accountStatus_id = ?, federationUser_arn = ? WHERE id = ?"
+	StmtKeyAcctInsert      = 12
+	QueryAcctInsert        = "INSERT IGNORE INTO account (id, email, name, accountType_id, accountStatus_id, federationUser_arn) VALUES (?, ?, ?, ?, ?, ?)"
+	StmtKeyAcctDelete      = 13
+	QueryAcctDelete        = "DELETE FROM account WHERE id = ?"
+	StmtKeyAcctUpdate      = 14
+	QueryAcctUpdate        = "UPDATE account SET email = ?, name = ?, accountType_id = ?, accountStatus_id = ?, federationUser_arn = ? WHERE id = ?"
+	StmtKeyAcctCheckUnique = 15
+	QueryAcctCheckUnique   = "SELECT account.id FROM account WHERE account.id = ? OR email = ? OR name = ?"
 )
 
 type account struct{}
@@ -53,6 +55,10 @@ func (p *account) stmts() []Statement {
 		{
 			ID:    StmtKeyAcctUpdate,
 			Query: QueryAcctUpdate,
+		},
+		{
+			ID:    StmtKeyAcctCheckUnique,
+			Query: QueryAcctCheckUnique,
 		},
 	}
 }

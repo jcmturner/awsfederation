@@ -57,7 +57,8 @@ func TestApp_Run(t *testing.T) {
 	}{
 		// Account Status
 		// Create
-		{"POST", httphandling.AccountStatusAPI, true, "", fmt.Sprintf(httphandling.AccountStatusPOSTTmpl, test.AccountStatusName1), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account status "+test.AccountStatusName1+" created.", http.StatusOK, appcodes.Info)},
+		{"POST", httphandling.AccountStatusAPI, true, "", fmt.Sprintf(httphandling.AccountStatusPOSTTmpl, test.AccountStatusName1+"removeme"), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account status "+test.AccountStatusName1+"removeme"+" created.", http.StatusOK, appcodes.Info)},
+		{"PUT", httphandling.AccountStatusAPI, true, "/1", fmt.Sprintf(httphandling.AccountStatusPUTTmpl, 1, test.AccountStatusName1), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, fmt.Sprintf("Account status %d updated.", test.AccountStatusID1), http.StatusOK, appcodes.Info)},
 		// Handle create duplicate
 		{"POST", httphandling.AccountStatusAPI, true, "", fmt.Sprintf(httphandling.AccountStatusPOSTTmpl, test.AccountStatusName1), http.StatusBadRequest, fmt.Sprintf(test.GenericResponseTmpl, "Account status with name "+test.AccountStatusName1+" already exists.", http.StatusBadRequest, appcodes.AccountStatusAlreadyExists)},
 		// List 1 entry
@@ -69,9 +70,9 @@ func TestApp_Run(t *testing.T) {
 		{"GET", httphandling.AccountStatusAPI, false, "", "", http.StatusOK, fmt.Sprintf(`{"AccountStatuses":[{"ID":%d,"Status":"%s"},{"ID":%d,"Status":"%s"}]}`, test.AccountStatusID1, test.AccountStatusName1, test.AccountStatusID2, test.AccountStatusName2)},
 		// Method not allowed
 		{"POST", httphandling.AccountStatusAPI, true, "/1", fmt.Sprintf(httphandling.AccountStatusPOSTTmpl, "somethingelse"), http.StatusMethodNotAllowed, fmt.Sprintf(test.GenericResponseTmpl, "The POST method cannot be performed against this part of the API", http.StatusMethodNotAllowed, appcodes.BadData)},
-		{"DELETE", httphandling.AccountStatusAPI, true, "/2", "", http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account status with ID 2 deleted.", http.StatusOK, appcodes.Info)},
-		{"DELETE", httphandling.AccountStatusAPI, true, "/2", "", http.StatusNotFound, fmt.Sprintf(test.GenericResponseTmpl, "Account status ID not found.", http.StatusNotFound, appcodes.AccountStatusUnknown)},
-		{"PUT", httphandling.AccountStatusAPI, true, "/1", fmt.Sprintf(httphandling.AccountStatusPUTTmpl, 1, "somethingelse"), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, fmt.Sprintf("Account status %d updated.", test.AccountStatusID1), http.StatusOK, appcodes.Info)},
+		{"POST", httphandling.AccountStatusAPI, true, "", fmt.Sprintf(httphandling.AccountStatusPOSTTmpl, "tmpstatus"), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account status tmpstatus created.", http.StatusOK, appcodes.Info)},
+		{"DELETE", httphandling.AccountStatusAPI, true, "/3", "", http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account status with ID 3 deleted.", http.StatusOK, appcodes.Info)},
+		{"DELETE", httphandling.AccountStatusAPI, true, "/3", "", http.StatusNotFound, fmt.Sprintf(test.GenericResponseTmpl, "Account status ID not found.", http.StatusNotFound, appcodes.AccountStatusUnknown)},
 
 		// Account Class
 		// Create
@@ -94,7 +95,8 @@ func TestApp_Run(t *testing.T) {
 
 		// Account Type
 		// Create
-		{"POST", httphandling.AccountTypeAPI, true, "", fmt.Sprintf(httphandling.AccountTypePOSTTmpl, test.AccountTypeName1, test.AccountClassID1), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account Type "+test.AccountTypeName1+" created.", http.StatusOK, appcodes.Info)},
+		{"POST", httphandling.AccountTypeAPI, true, "", fmt.Sprintf(httphandling.AccountTypePOSTTmpl, test.AccountTypeName1+"removeme", test.AccountClassID1), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account Type "+test.AccountTypeName1+"removeme"+" created.", http.StatusOK, appcodes.Info)},
+		{"PUT", httphandling.AccountTypeAPI, true, "/1", fmt.Sprintf(httphandling.AccountTypePUTTmpl, 1, test.AccountTypeName1, test.AccountClassID1), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, fmt.Sprintf("Account Type %d updated.", test.AccountTypeID1), http.StatusOK, appcodes.Info)},
 		// Handle create duplicate
 		{"POST", httphandling.AccountTypeAPI, true, "", fmt.Sprintf(httphandling.AccountTypePOSTTmpl, test.AccountTypeName1, test.AccountClassID1), http.StatusBadRequest, fmt.Sprintf(test.GenericResponseTmpl, "Account Type with name "+test.AccountTypeName1+" already exists.", http.StatusBadRequest, appcodes.AccountTypeAlreadyExists)},
 		// List 1 entry
@@ -106,10 +108,44 @@ func TestApp_Run(t *testing.T) {
 		{"GET", httphandling.AccountTypeAPI, false, "", "", http.StatusOK, fmt.Sprintf(`{"AccountTypes":[`+httphandling.AccountTypeGETTmpl+","+httphandling.AccountTypeGETTmpl+`]}`, test.AccountTypeID1, test.AccountTypeName1, test.AccountClassID1, test.AccountTypeID2, test.AccountTypeName2, test.AccountClassID2)},
 		// Method not allowed
 		{"POST", httphandling.AccountTypeAPI, true, "/1", fmt.Sprintf(httphandling.AccountTypePOSTTmpl, "somethingelse", test.AccountClassID1), http.StatusMethodNotAllowed, fmt.Sprintf(test.GenericResponseTmpl, "The POST method cannot be performed against this part of the API", http.StatusMethodNotAllowed, appcodes.BadData)},
-		{"PUT", httphandling.AccountTypeAPI, true, "/1", fmt.Sprintf(httphandling.AccountTypePUTTmpl, 1, "somethingelse", test.AccountClassID2), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, fmt.Sprintf("Account Type %d updated.", test.AccountTypeID1), http.StatusOK, appcodes.Info)},
 		{"POST", httphandling.AccountTypeAPI, true, "", fmt.Sprintf(httphandling.AccountTypePOSTTmpl, "tmptype", test.AccountClassID1), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account Type tmptype created.", http.StatusOK, appcodes.Info)},
 		{"DELETE", httphandling.AccountTypeAPI, true, "/3", "", http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account Type with ID 3 deleted.", http.StatusOK, appcodes.Info)},
 		{"DELETE", httphandling.AccountTypeAPI, true, "/3", "", http.StatusNotFound, fmt.Sprintf(test.GenericResponseTmpl, "Account Type ID not found.", http.StatusNotFound, appcodes.AccountTypeUnknown)},
+
+		{"POST", httphandling.FederationUserAPI, true, "", fmt.Sprintf(httphandling.FederationUserPOSTTmpl, test.FedUserName1, test.FedUserArn1, test.IAMUser1SecretAccessKey, test.IAMUser1SessionToken, test.IAMUser1Expiration, test.IAMUser1AccessKeyId, test.FedUserTTL1, test.IAMUser1MFASerial, test.IAMUser1MFASecret), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Federation user "+test.FedUserArn1+" created.", http.StatusOK, appcodes.Info)},
+		{"GET", httphandling.FederationUserAPI, false, "/" + test.FedUserArn1, "", http.StatusOK, fmt.Sprintf(httphandling.FederationUserResponseTmpl, test.FedUserArn1, test.IAMUser1Expiration, test.IAMUser1AccessKeyId, test.FedUserTTL1, test.IAMUser1MFASerial)},
+		{"GET", httphandling.FederationUserAPI, false, "", "", http.StatusOK, "{\"FederationUsers\":[\"" + test.FedUserArn1 + "\"]}"},
+		{"GET", httphandling.FederationUserAPI, false, fmt.Sprintf("/arn:aws:iam::%s:user", test.AWSAccountID1), "", http.StatusOK, "{\"FederationUsers\":[\"" + test.FedUserArn1 + "\"]}"},
+		{"GET", httphandling.FederationUserAPI, false, "/arn:aws:iam::123456789012:user/notexist", "", http.StatusNotFound, fmt.Sprintf(test.GenericResponseTmpl, "Federation user not found.", http.StatusNotFound, appcodes.FederationUserUnknown)},
+		{"POST", httphandling.FederationUserAPI, true, "", fmt.Sprintf(httphandling.FederationUserPOSTTmpl, test.FedUserName1, test.FedUserArn1, test.IAMUser1SecretAccessKey, test.IAMUser1SessionToken, test.IAMUser1Expiration, test.IAMUser1AccessKeyId, test.FedUserTTL1, test.IAMUser1MFASerial, test.IAMUser1MFASecret), http.StatusConflict, fmt.Sprintf(test.GenericResponseTmpl, "Federation user already exists.", http.StatusConflict, appcodes.FederationUserAlreadyExists)},
+		{"POST", httphandling.FederationUserAPI, true, "/" + test.FedUserArn1, fmt.Sprintf(httphandling.FederationUserPOSTTmpl, test.FedUserName1, test.FedUserArn1, test.IAMUser1SecretAccessKey, test.IAMUser1SessionToken, test.IAMUser1Expiration, test.IAMUser1AccessKeyId, test.FedUserTTL1, test.IAMUser1MFASerial, test.IAMUser1MFASecret), http.StatusMethodNotAllowed, fmt.Sprintf(test.GenericResponseTmpl, "The POST method cannot be performed against this part of the API", http.StatusMethodNotAllowed, appcodes.BadData)},
+		{"POST", httphandling.FederationUserAPI, true, "", fmt.Sprintf(httphandling.FederationUserPOSTTmpl, test.FedUserName2, test.FedUserArn2, test.IAMUser2SecretAccessKey, test.IAMUser2SessionToken, test.IAMUser2Expiration, test.IAMUser2AccessKeyId, test.FedUserTTL2, test.IAMUser2MFASerial, test.IAMUser2MFASecret), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Federation user "+test.FedUserArn2+" created.", http.StatusOK, appcodes.Info)},
+		{"DELETE", httphandling.FederationUserAPI, true, "/" + test.FedUserArn2, "", http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Federation user "+test.FedUserArn2+" deleted.", http.StatusOK, appcodes.Info)},
+		{"GET", httphandling.FederationUserAPI, false, "/" + test.FedUserArn2, "", http.StatusNotFound, fmt.Sprintf(test.GenericResponseTmpl, "Federation user not found.", http.StatusNotFound, appcodes.FederationUserUnknown)},
+		{"POST", httphandling.FederationUserAPI, true, "", fmt.Sprintf(httphandling.FederationUserPOSTTmpl, test.FedUserName2, test.FedUserArn2, test.IAMUser2SecretAccessKey, test.IAMUser2SessionToken, test.IAMUser2Expiration, test.IAMUser2AccessKeyId, test.FedUserTTL2, test.IAMUser2MFASerial, test.IAMUser2MFASecret), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Federation user "+test.FedUserArn2+" created.", http.StatusOK, appcodes.Info)},
+		{"GET", httphandling.FederationUserAPI, false, "", "", http.StatusOK, "{\"FederationUsers\":[\"" + test.FedUserArn1 + "\",\"" + test.FedUserArn2 + "\"]}"},
+		{"GET", httphandling.FederationUserAPI, false, fmt.Sprintf("/arn:aws:iam::%s:user", test.AWSAccountID1), "", http.StatusOK, "{\"FederationUsers\":[\"" + test.FedUserArn1 + "\"]}"},
+		{"GET", httphandling.FederationUserAPI, false, fmt.Sprintf("/arn:aws:iam::%s:user", test.AWSAccountID2), "", http.StatusOK, "{\"FederationUsers\":[\"" + test.FedUserArn2 + "\"]}"},
+		{"PUT", httphandling.FederationUserAPI, true, "/arn:aws:iam::123456789012:user/blah", fmt.Sprintf(httphandling.FederationUserPOSTTmpl, "blah", "arn:aws:iam::123456789012:user/blah", test.IAMUser1SecretAccessKey, test.IAMUser1SessionToken, test.IAMUser1Expiration, test.IAMUser1AccessKeyId, test.FedUserTTL1, test.IAMUser1MFASerial, test.IAMUser1MFASecret), http.StatusNotFound, fmt.Sprintf(test.GenericResponseTmpl, "Federation user not found.", http.StatusNotFound, appcodes.FederationUserUnknown)},
+		{"PUT", httphandling.FederationUserAPI, true, "/" + test.FedUserArn1, fmt.Sprintf(httphandling.FederationUserPOSTTmpl, test.FedUserName1, test.FedUserArn1, test.IAMUser1SecretAccessKey, test.IAMUser1SessionToken, test.IAMUser1Expiration, test.IAMUser2AccessKeyId, test.FedUserTTL1, test.IAMUser1MFASerial, test.IAMUser1MFASecret), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Federation user "+test.FedUserArn1+" updated.", http.StatusOK, appcodes.Info)},
+		{"GET", httphandling.FederationUserAPI, false, "/" + test.FedUserArn1, "", http.StatusOK, fmt.Sprintf(httphandling.FederationUserResponseTmpl, test.FedUserArn1, test.IAMUser1Expiration, test.IAMUser2AccessKeyId, test.FedUserTTL1, test.IAMUser1MFASerial)},
+
+		// Create
+		{"POST", httphandling.AccountAPI, true, "", fmt.Sprintf(httphandling.AccountPOSTTmpl, test.AWSAccountID1, test.AccountEmail1, test.AccountName1, test.AccountTypeID1, test.AccountStatusID1, test.FedUserArn1), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account "+test.AWSAccountID1+" created.", http.StatusOK, appcodes.Info)},
+		// Handle create duplicate
+		{"POST", httphandling.AccountAPI, true, "", fmt.Sprintf(httphandling.AccountPOSTTmpl, test.AWSAccountID1, test.AccountEmail1, test.AccountName1, test.AccountTypeID1, test.AccountStatusID1, test.FedUserArn1), http.StatusBadRequest, fmt.Sprintf(test.GenericResponseTmpl, "An Account with either the ID "+test.AWSAccountID1+", email "+test.AccountEmail1+" or name "+test.AccountName1+" already exists.", http.StatusBadRequest, appcodes.AccountAlreadyExists)},
+		// List 1 entry
+		{"GET", httphandling.AccountAPI, false, "", "", http.StatusOK, fmt.Sprintf(`{"Accounts":[`+httphandling.AccountGETTmpl+`]}`, test.AWSAccountID1, test.AccountEmail1, test.AccountName1, test.AccountTypeID1, test.AccountTypeName1, test.AccountClassID1, test.AccountClassName1, test.AccountStatusID1, test.AccountStatusName1, test.FedUserArn1)},
+		// Get
+		{"GET", httphandling.AccountAPI, false, "/" + test.AWSAccountID1, "", http.StatusOK, fmt.Sprintf(httphandling.AccountGETTmpl, test.AWSAccountID1, test.AccountEmail1, test.AccountName1, test.AccountTypeID1, test.AccountTypeName1, test.AccountClassID1, test.AccountClassName1, test.AccountStatusID1, test.AccountStatusName1, test.FedUserArn1)},
+		{"POST", httphandling.AccountAPI, true, "", fmt.Sprintf(httphandling.AccountPOSTTmpl, test.AWSAccountID2, test.AccountEmail2, test.AccountName2, test.AccountTypeID2, test.AccountStatusID2, test.FedUserArn2), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account "+test.AWSAccountID2+" created.", http.StatusOK, appcodes.Info)},
+		//// List multiple
+		{"GET", httphandling.AccountAPI, false, "", "", http.StatusOK, fmt.Sprintf(`{"Accounts":[`+httphandling.AccountGETTmpl+","+httphandling.AccountGETTmpl+`]}`, test.AWSAccountID1, test.AccountEmail1, test.AccountName1, test.AccountTypeID1, test.AccountTypeName1, test.AccountClassID1, test.AccountClassName1, test.AccountStatusID1, test.AccountStatusName1, test.FedUserArn1, test.AWSAccountID2, test.AccountEmail2, test.AccountName2, test.AccountTypeID2, test.AccountTypeName2, test.AccountClassID2, test.AccountClassName2, test.AccountStatusID2, test.AccountStatusName2, test.FedUserArn2)},
+		//// Method not allowed
+		{"POST", httphandling.AccountAPI, true, "/" + test.AWSAccountID1, fmt.Sprintf(httphandling.AccountPOSTTmpl, test.AWSAccountID1, test.AccountEmail1, test.AccountName1, test.AccountTypeID1, test.AccountStatusID1, test.FedUserArn1), http.StatusMethodNotAllowed, fmt.Sprintf(test.GenericResponseTmpl, "The POST method cannot be performed against this part of the API", http.StatusMethodNotAllowed, appcodes.BadData)},
+		{"DELETE", httphandling.AccountAPI, true, "/" + test.AWSAccountID2, "", http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account with ID "+test.AWSAccountID2+" deleted.", http.StatusOK, appcodes.Info)},
+		{"DELETE", httphandling.AccountAPI, true, "/" + test.AWSAccountID2, "", http.StatusNotFound, fmt.Sprintf(test.GenericResponseTmpl, "Account ID not found.", http.StatusNotFound, appcodes.AccountUnknown)},
+		{"PUT", httphandling.AccountAPI, true, "/" + test.AWSAccountID1, fmt.Sprintf(httphandling.AccountPOSTTmpl, test.AWSAccountID1, test.AccountEmail1, test.AccountName1, test.AccountTypeID2, test.AccountStatusID1, test.FedUserArn1), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, fmt.Sprintf("Account %s updated.", test.AWSAccountID1), http.StatusOK, appcodes.Info)},
 	}
 
 	for _, test := range tests {

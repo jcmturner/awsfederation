@@ -14,7 +14,10 @@ import (
 )
 
 const (
-	MuxVarUsername = "username"
+	MuxVarUsername             = "username"
+	FederationUserAPI          = "federationuser"
+	FederationUserResponseTmpl = "{\"Name\":\"\",\"Arn\":\"%s\",\"Credentials\":{\"SecretAccessKey\":\"REDACTED\",\"SessionToken\":\"REDACTED\",\"Expiration\":\"%s\",\"AccessKeyId\":\"%s\"},\"TTL\":%d,\"MFASerialNumber\":\"%s\",\"MFASecret\":\"REDACTED\"}"
+	FederationUserPOSTTmpl     = "{\"Name\":\"%s\",\"Arn\":\"%s\",\"Credentials\":{\"SecretAccessKey\":\"%s\",\"SessionToken\":\"%s\",\"Expiration\":\"%s\",\"AccessKeyId\":\"%s\"},\"TTL\":%d,\"MFASerialNumber\":\"%s\",\"MFASecret\":\"%s\"}"
 )
 
 func listAllFederationUserFunc(c *config.Config) http.HandlerFunc {
@@ -182,21 +185,21 @@ func getFederationUserRoutes(c *config.Config, stmtMap *database.StmtMap) []Rout
 			Method:         "GET",
 			Pattern:        fmt.Sprintf("/" + APIVersion + "/federationuser"),
 			HandlerFunc:    listAllFederationUserFunc(c),
-			Authentication: true,
+			Authentication: false,
 		},
 		{
 			Name:           "FederationUserAccountList",
 			Method:         "GET",
 			Pattern:        fmt.Sprintf("/" + APIVersion + "/federationuser/arn:aws:iam::" + "{" + MuxVarAccountID + ":[0-9]{12}}:user"),
 			HandlerFunc:    listAccountFederationUserFunc(c),
-			Authentication: true,
+			Authentication: false,
 		},
 		{
 			Name:           "FederationUserGet",
 			Method:         "GET",
 			Pattern:        fmt.Sprintf("/"+APIVersion+"/federationuser/"+federationuser.FedUserARNFormat, "{"+MuxVarAccountID+":[0-9]{12}}", "{"+MuxVarUsername+"}"),
 			HandlerFunc:    getFederationUserFunc(c),
-			Authentication: true,
+			Authentication: false,
 		},
 		{
 			Name:           "FederationUserUpdate",

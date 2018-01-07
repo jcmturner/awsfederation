@@ -76,6 +76,8 @@ CREATE TABLE IF NOT EXISTS awsfederation.account (
   INDEX fk_account_accountType1_idx (accountType_id ASC),
   INDEX fk_account_accountStatus1_idx (accountStatus_id ASC),
   INDEX fk_account_federationUser1_idx (federationUser_arn ASC),
+  UNIQUE INDEX email_UNIQUE (email ASC),
+  UNIQUE INDEX name_UNIQUE (name ASC),
   CONSTRAINT fk_account_accountType1
     FOREIGN KEY (accountType_id)
     REFERENCES awsfederation.accountType (id)
