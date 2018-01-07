@@ -65,9 +65,9 @@ func TestApp_Run(t *testing.T) {
 		// Get
 		{"GET", httphandling.AccountStatusAPI, false, "/1", "", http.StatusOK, fmt.Sprintf(`{"ID":%d,"Status":"%s"}`, test.AccountStatusID1, test.AccountStatusName1)},
 		{"POST", httphandling.AccountStatusAPI, true, "", fmt.Sprintf(httphandling.AccountStatusPOSTTmpl, test.AccountStatusName2), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account status "+test.AccountStatusName2+" created.", http.StatusOK, appcodes.Info)},
-		//// List multiple
+		// List multiple
 		{"GET", httphandling.AccountStatusAPI, false, "", "", http.StatusOK, fmt.Sprintf(`{"AccountStatuses":[{"ID":%d,"Status":"%s"},{"ID":%d,"Status":"%s"}]}`, test.AccountStatusID1, test.AccountStatusName1, test.AccountStatusID2, test.AccountStatusName2)},
-		//// Method not allowed
+		// Method not allowed
 		{"POST", httphandling.AccountStatusAPI, true, "/1", fmt.Sprintf(httphandling.AccountStatusPOSTTmpl, "somethingelse"), http.StatusMethodNotAllowed, fmt.Sprintf(test.GenericResponseTmpl, "The POST method cannot be performed against this part of the API", http.StatusMethodNotAllowed, appcodes.BadData)},
 		{"DELETE", httphandling.AccountStatusAPI, true, "/2", "", http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account status with ID 2 deleted.", http.StatusOK, appcodes.Info)},
 		{"DELETE", httphandling.AccountStatusAPI, true, "/2", "", http.StatusNotFound, fmt.Sprintf(test.GenericResponseTmpl, "Account status ID not found.", http.StatusNotFound, appcodes.AccountStatusUnknown)},
@@ -83,13 +83,33 @@ func TestApp_Run(t *testing.T) {
 		// Get
 		{"GET", httphandling.AccountClassAPI, false, "/1", "", http.StatusOK, fmt.Sprintf(`{"ID":%d,"Class":"%s"}`, test.AccountClassID1, test.AccountClassName1)},
 		{"POST", httphandling.AccountClassAPI, true, "", fmt.Sprintf(httphandling.AccountClassPOSTTmpl, test.AccountClassName2), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account class "+test.AccountClassName2+" created.", http.StatusOK, appcodes.Info)},
-		//// List multiple
+		// List multiple
 		{"GET", httphandling.AccountClassAPI, false, "", "", http.StatusOK, fmt.Sprintf(`{"AccountClasses":[{"ID":%d,"Class":"%s"},{"ID":%d,"Class":"%s"}]}`, test.AccountClassID1, test.AccountClassName1, test.AccountClassID2, test.AccountClassName2)},
-		//// Method not allowed
+		// Method not allowed
 		{"POST", httphandling.AccountClassAPI, true, "/1", fmt.Sprintf(httphandling.AccountClassPOSTTmpl, "somethingelse"), http.StatusMethodNotAllowed, fmt.Sprintf(test.GenericResponseTmpl, "The POST method cannot be performed against this part of the API", http.StatusMethodNotAllowed, appcodes.BadData)},
-		{"DELETE", httphandling.AccountClassAPI, true, "/2", "", http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account class with ID 2 deleted.", http.StatusOK, appcodes.Info)},
-		{"DELETE", httphandling.AccountClassAPI, true, "/2", "", http.StatusNotFound, fmt.Sprintf(test.GenericResponseTmpl, "Account class ID not found.", http.StatusNotFound, appcodes.AccountClassUnknown)},
-		{"PUT", httphandling.AccountClassAPI, true, "/1", fmt.Sprintf(httphandling.AccountClassPUTTmpl, 1, "somethingelse"), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, fmt.Sprintf("Account class %d updated.", test.AccountClassID1), http.StatusOK, appcodes.Info)},
+		{"POST", httphandling.AccountClassAPI, true, "", fmt.Sprintf(httphandling.AccountClassPOSTTmpl, "tmpclass"), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account class tmpclass created.", http.StatusOK, appcodes.Info)},
+		{"PUT", httphandling.AccountClassAPI, true, "/3", fmt.Sprintf(httphandling.AccountClassPUTTmpl, 3, "somethingelse"), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, fmt.Sprintf("Account class %d updated.", 3), http.StatusOK, appcodes.Info)},
+		{"DELETE", httphandling.AccountClassAPI, true, "/3", "", http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account class with ID 3 deleted.", http.StatusOK, appcodes.Info)},
+		{"DELETE", httphandling.AccountClassAPI, true, "/3", "", http.StatusNotFound, fmt.Sprintf(test.GenericResponseTmpl, "Account class ID not found.", http.StatusNotFound, appcodes.AccountClassUnknown)},
+
+		// Account Type
+		// Create
+		{"POST", httphandling.AccountTypeAPI, true, "", fmt.Sprintf(httphandling.AccountTypePOSTTmpl, test.AccountTypeName1, test.AccountClassID1), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account Type "+test.AccountTypeName1+" created.", http.StatusOK, appcodes.Info)},
+		// Handle create duplicate
+		{"POST", httphandling.AccountTypeAPI, true, "", fmt.Sprintf(httphandling.AccountTypePOSTTmpl, test.AccountTypeName1, test.AccountClassID1), http.StatusBadRequest, fmt.Sprintf(test.GenericResponseTmpl, "Account Type with name "+test.AccountTypeName1+" already exists.", http.StatusBadRequest, appcodes.AccountTypeAlreadyExists)},
+		// List 1 entry
+		{"GET", httphandling.AccountTypeAPI, false, "", "", http.StatusOK, fmt.Sprintf(`{"AccountTypes":[`+httphandling.AccountTypeGETTmpl+`]}`, test.AccountTypeID1, test.AccountTypeName1, test.AccountClassID1)},
+		// Get
+		{"GET", httphandling.AccountTypeAPI, false, "/1", "", http.StatusOK, fmt.Sprintf(httphandling.AccountTypeGETTmpl, test.AccountTypeID1, test.AccountTypeName1, test.AccountClassID1)},
+		{"POST", httphandling.AccountTypeAPI, true, "", fmt.Sprintf(httphandling.AccountTypePOSTTmpl, test.AccountTypeName2, test.AccountClassID2), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account Type "+test.AccountTypeName2+" created.", http.StatusOK, appcodes.Info)},
+		// List multiple
+		{"GET", httphandling.AccountTypeAPI, false, "", "", http.StatusOK, fmt.Sprintf(`{"AccountTypes":[`+httphandling.AccountTypeGETTmpl+","+httphandling.AccountTypeGETTmpl+`]}`, test.AccountTypeID1, test.AccountTypeName1, test.AccountClassID1, test.AccountTypeID2, test.AccountTypeName2, test.AccountClassID2)},
+		// Method not allowed
+		{"POST", httphandling.AccountTypeAPI, true, "/1", fmt.Sprintf(httphandling.AccountTypePOSTTmpl, "somethingelse", test.AccountClassID1), http.StatusMethodNotAllowed, fmt.Sprintf(test.GenericResponseTmpl, "The POST method cannot be performed against this part of the API", http.StatusMethodNotAllowed, appcodes.BadData)},
+		{"PUT", httphandling.AccountTypeAPI, true, "/1", fmt.Sprintf(httphandling.AccountTypePUTTmpl, 1, "somethingelse", test.AccountClassID2), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, fmt.Sprintf("Account Type %d updated.", test.AccountTypeID1), http.StatusOK, appcodes.Info)},
+		{"POST", httphandling.AccountTypeAPI, true, "", fmt.Sprintf(httphandling.AccountTypePOSTTmpl, "tmptype", test.AccountClassID1), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account Type tmptype created.", http.StatusOK, appcodes.Info)},
+		{"DELETE", httphandling.AccountTypeAPI, true, "/3", "", http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account Type with ID 3 deleted.", http.StatusOK, appcodes.Info)},
+		{"DELETE", httphandling.AccountTypeAPI, true, "/3", "", http.StatusNotFound, fmt.Sprintf(test.GenericResponseTmpl, "Account Type ID not found.", http.StatusNotFound, appcodes.AccountTypeUnknown)},
 	}
 
 	for _, test := range tests {

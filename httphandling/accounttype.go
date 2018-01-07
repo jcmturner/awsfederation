@@ -1,6 +1,7 @@
 package httphandling
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
@@ -14,6 +15,10 @@ import (
 
 const (
 	MuxVarAccountTypeID = "accountTypeID"
+	AccountTypeAPI      = "accounttype"
+	AccountTypeGETTmpl  = "{\"ID\":%d,\"Type\":\"%s\",\"Class\":{\"ID\":%d}}"
+	AccountTypePOSTTmpl = "{\"Type\":\"%s\",\"Class\":{\"ID\":%d}}"
+	AccountTypePUTTmpl  = "{\"ID\":%d,\"Type\":\"%s\",\"Class\":{\"ID\":%d}}"
 )
 
 type accountType struct {
@@ -126,14 +131,29 @@ func createAccountTypeFunc(c *config.Config, stmtMap *database.StmtMap) http.Han
 			respondGeneric(w, http.StatusBadRequest, appcodes.BadData, "invalid post data")
 			return
 		}
-		stmtKey := database.StmtKeyAcctTypeInsert
+
+		// Check it does not already exist
+		stmtKey := database.StmtKeyAcctTypeByName
+		if _, ok := (*stmtMap)[stmtKey]; !ok {
+			c.ApplicationLogf("error, prepared statement for getting an account type by name not found")
+			respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
+			return
+		}
+		stmt := (*stmtMap)[stmtKey]
+		err = stmt.QueryRow(a.Type).Scan()
+		if err != sql.ErrNoRows {
+			respondGeneric(w, http.StatusBadRequest, appcodes.AccountTypeAlreadyExists, fmt.Sprintf("Account Type with name %s already exists.", a.Type))
+			return
+		}
+
+		stmtKey = database.StmtKeyAcctTypeInsert
 		if _, ok := (*stmtMap)[stmtKey]; !ok {
 			c.ApplicationLogf("error, prepared statement for creating an account type not found")
 			respondGeneric(w, http.StatusInternalServerError, appcodes.ServerConfigurationError, "database statement not found")
 			return
 		}
-		stmt := (*stmtMap)[stmtKey]
-		res, err := stmt.Exec(a.Type)
+		stmt = (*stmtMap)[stmtKey]
+		res, err := stmt.Exec(a.Type, a.Class.ID)
 		if err != nil {
 			c.ApplicationLogf("error executing database statement for creating account type: %v", err)
 			respondGeneric(w, http.StatusInternalServerError, appcodes.DatabaseError, err.Error())

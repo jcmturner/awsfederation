@@ -38,7 +38,7 @@ ENGINE = InnoDB;
 -- Table awsfederation.accountType
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS awsfederation.accountType (
-  id INT NOT NULL,
+  id INT NOT NULL AUTO_INCREMENT,
   type VARCHAR(45) NOT NULL,
   class_id INT NOT NULL,
   PRIMARY KEY (id),
