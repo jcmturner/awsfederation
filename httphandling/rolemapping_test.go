@@ -17,12 +17,7 @@ import (
 	"testing"
 )
 
-const (
-	RoleMappingAPIPath  = "/%s/rolemapping%s"
-	RoleMappingPOSTTmpl = "{\"RoleARN\":\"%s\",\"AuthzAttribute\":\"%s\"}"
-	RoleMappingPUTTmpl  = "{\"ID\":\"%s\",\"RoleARN\":\"%s\",\"AuthzAttribute\":\"%s\"}"
-	RoleMappingGETTmpl  = "{\"ID\":\"%s\",\"RoleARN\":\"%s\",\"AuthzAttribute\":\"%s\",\"AccountID\":\"%s\"}"
-)
+const ()
 
 func TestRoleMapping(t *testing.T) {
 	c, _, _, ep, stmtMap, s := test.TestEnv(t)
@@ -32,6 +27,7 @@ func TestRoleMapping(t *testing.T) {
 
 	var tests = []struct {
 		Method         string
+		Endpoint       string
 		AuthRequired   bool
 		Path           string
 		PostPayload    string
@@ -39,26 +35,23 @@ func TestRoleMapping(t *testing.T) {
 		ResponseString string
 	}{
 		// Create
-		{"POST", true, "", fmt.Sprintf(RoleMappingPOSTTmpl, test.RoleARN1, test.AuthzAttrib1), http.StatusCreated, fmt.Sprintf(test.CreatedResponseTmpl, "", "")},
-		// Handle create duplicate
-		{"POST", true, "", fmt.Sprintf(RoleMappingPOSTTmpl, test.RoleARN1, test.AuthzAttrib1), http.StatusBadRequest, fmt.Sprintf(test.GenericResponseTmpl, fmt.Sprintf("Role Mapping with ARN %s and Authz Attrbute %s already exists.", test.RoleARN1, test.AuthzAttrib1), http.StatusBadRequest, appcodes.RoleMappingAlreadyExists)},
+		{"POST", RoleMappingAPI, true, "", fmt.Sprintf(RoleMappingPOSTTmpl, test.RoleARN1, test.AuthzAttrib1), http.StatusCreated, fmt.Sprintf(test.CreatedResponseTmpl, "", "")},
 		// List 1 entry
-		{"GET", false, "", "", http.StatusOK, fmt.Sprintf(`{"RoleMappings":[`+RoleMappingGETTmpl+`]}`, test.UUID1, test.RoleARN1, test.AuthzAttrib1, test.AWSAccountID1)},
+		{"GET", RoleMappingAPI, false, "", "", http.StatusOK, fmt.Sprintf(`{"RoleMappings":[`+RoleMappingGETTmpl+`]}`, test.UUID1, test.RoleARN1, test.AuthzAttrib1, test.AWSAccountID1)},
 		// Get
-		{"GET", false, "/" + test.UUID1, "", http.StatusOK, fmt.Sprintf(RoleMappingGETTmpl, test.UUID1, test.RoleARN1, test.AuthzAttrib1, test.AWSAccountID1)},
-		{"POST", true, "", fmt.Sprintf(RoleMappingPOSTTmpl, test.RoleARN2, test.AuthzAttrib2), http.StatusCreated, fmt.Sprintf(test.CreatedResponseTmpl, "", "")},
+		{"GET", RoleMappingAPI, false, "/" + test.UUID1, "", http.StatusOK, fmt.Sprintf(RoleMappingGETTmpl, test.UUID1, test.RoleARN1, test.AuthzAttrib1, test.AWSAccountID1)},
+		{"POST", RoleMappingAPI, true, "", fmt.Sprintf(RoleMappingPOSTTmpl, test.RoleARN2, test.AuthzAttrib2), http.StatusCreated, fmt.Sprintf(test.CreatedResponseTmpl, "", "")},
 		//// List multiple
-		{"GET", false, "", "", http.StatusOK, fmt.Sprintf(`{"RoleMappings":[`+RoleMappingGETTmpl+`,`+RoleMappingGETTmpl+`]}`, test.UUID1, test.RoleARN1, test.AuthzAttrib1, test.AWSAccountID1, test.UUID2, test.RoleARN2, test.AuthzAttrib2, test.AWSAccountID2)},
+		{"GET", RoleMappingAPI, false, "", "", http.StatusOK, fmt.Sprintf(`{"RoleMappings":[`+RoleMappingGETTmpl+`,`+RoleMappingGETTmpl+`]}`, test.UUID1, test.RoleARN1, test.AuthzAttrib1, test.AWSAccountID1, test.UUID2, test.RoleARN2, test.AuthzAttrib2, test.AWSAccountID2)},
 		//// Method not allowed
-		{"POST", true, "/" + test.UUID1, fmt.Sprintf(RoleMappingPOSTTmpl, test.RoleARN1, test.AuthzAttrib2), http.StatusMethodNotAllowed, fmt.Sprintf(test.GenericResponseTmpl, "The POST method cannot be performed against this part of the API", http.StatusMethodNotAllowed, appcodes.BadData)},
-		{"DELETE", true, "/" + test.UUID2, "", http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Role Mapping with ID "+test.UUID2+" deleted.", http.StatusOK, appcodes.Info)},
-		{"DELETE", true, "/" + test.UUID2, "", http.StatusNotFound, fmt.Sprintf(test.GenericResponseTmpl, "Role Mapping ID not found.", http.StatusNotFound, appcodes.RoleMappingUnknown)},
-		{"PUT", true, "/" + test.UUID1, fmt.Sprintf(RoleMappingPUTTmpl, test.UUID1, test.RoleARN1, test.AuthzAttrib2), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, fmt.Sprintf("Role Mapping %s updated.", test.UUID1), http.StatusOK, appcodes.Info)},
+		{"POST", RoleMappingAPI, true, "/" + test.UUID1, fmt.Sprintf(RoleMappingPOSTTmpl, test.RoleARN1, test.AuthzAttrib2), http.StatusMethodNotAllowed, fmt.Sprintf(test.GenericResponseTmpl, "The POST method cannot be performed against this part of the API", http.StatusMethodNotAllowed, appcodes.BadData)},
+		{"DELETE", RoleMappingAPI, true, "/" + test.UUID2, "", http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Role Mapping with ID "+test.UUID2+" deleted.", http.StatusOK, appcodes.Info)},
+		{"DELETE", RoleMappingAPI, true, "/" + test.UUID2, "", http.StatusNotFound, fmt.Sprintf(test.GenericResponseTmpl, "Role Mapping ID not found.", http.StatusNotFound, appcodes.RoleMappingUnknown)},
+		{"PUT", RoleMappingAPI, true, "/" + test.UUID1, fmt.Sprintf(RoleMappingPUTTmpl, test.UUID1, test.RoleARN1, test.AuthzAttrib2), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, fmt.Sprintf("Role Mapping %s updated.", test.UUID1), http.StatusOK, appcodes.Info)},
 	}
 
 	// Set the expected database calls that are performed as part of the table tests
 	ep[database.StmtKeyRoleMappingInsert].ExpectExec().WithArgs(sqlmock.AnyArg(), test.AWSAccountID1, test.RoleARN1, test.AuthzAttrib1, "", 0, "").WillReturnResult(sqlmock.NewResult(0, 1))
-	ep[database.StmtKeyRoleMappingInsert].ExpectExec().WithArgs(sqlmock.AnyArg(), test.AWSAccountID1, test.RoleARN1, test.AuthzAttrib1, "", 0, "").WillReturnResult(sqlmock.NewResult(1, 0))
 	rows1 := sqlmock.NewRows([]string{"id", "acctid", "rolearn", "authz", "policy", "duration", "sessfmt"}).
 		AddRow(test.UUID1, test.AWSAccountID1, test.RoleARN1, test.AuthzAttrib1, "", 0, "")
 	ep[database.StmtKeyRoleMappingSelectList].ExpectQuery().WillReturnRows(rows1)
@@ -75,7 +68,7 @@ func TestRoleMapping(t *testing.T) {
 	ep[database.StmtKeyRoleMappingUpdate].ExpectExec().WithArgs(test.AWSAccountID1, test.RoleARN1, test.AuthzAttrib2, "", 0, "", test.UUID1).WillReturnResult(sqlmock.NewResult(0, 1))
 
 	for _, test := range tests {
-		url := fmt.Sprintf(RoleMappingAPIPath, APIVersion, test.Path)
+		url := fmt.Sprintf("http://127.0.0.1:8443/%s/%s%s", APIVersion, test.Endpoint, test.Path)
 		request, err := http.NewRequest(test.Method, url, strings.NewReader(test.PostPayload))
 		if err != nil {
 			t.Fatalf("error building request: %v", err)

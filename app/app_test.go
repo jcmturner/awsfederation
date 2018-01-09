@@ -149,6 +149,22 @@ func TestApp_Run(t *testing.T) {
 		{"DELETE", httphandling.AccountAPI, true, "/" + test.AWSAccountID2, "", http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account with ID "+test.AWSAccountID2+" deleted.", http.StatusOK, appcodes.Info)},
 		{"DELETE", httphandling.AccountAPI, true, "/" + test.AWSAccountID2, "", http.StatusNotFound, fmt.Sprintf(test.GenericResponseTmpl, "Account ID not found.", http.StatusNotFound, appcodes.AccountUnknown)},
 		{"PUT", httphandling.AccountAPI, true, "/" + test.AWSAccountID1, fmt.Sprintf(httphandling.AccountPOSTTmpl, test.AWSAccountID1, test.AccountEmail1, test.AccountName1, test.AccountTypeID2, test.AccountStatusID1, test.FedUserArn1), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, fmt.Sprintf("Account %s updated.", test.AWSAccountID1), http.StatusOK, appcodes.Info)},
+		{"POST", httphandling.AccountAPI, true, "", fmt.Sprintf(httphandling.AccountPOSTTmpl, test.AWSAccountID2, test.AccountEmail2, test.AccountName2, test.AccountTypeID2, test.AccountStatusID2, test.FedUserArn2), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account "+test.AWSAccountID2+" created.", http.StatusOK, appcodes.Info)},
+
+		// Role Mapping
+		//{"POST", httphandling.RoleMappingAPI, true, "", fmt.Sprintf(httphandling.RoleMappingPOSTTmpl, test.RoleARN1, test.AuthzAttrib1), http.StatusCreated, fmt.Sprintf(test.CreatedResponseTmpl, "", "")},
+		//// List 1 entry
+		//{"GET", httphandling.RoleMappingAPI, false, "", "", http.StatusOK, fmt.Sprintf(`{"RoleMappings":[`+httphandling.RoleMappingGETTmpl+`]}`, test.UUID1, test.RoleARN1, test.AuthzAttrib1, test.AWSAccountID1)},
+		//// Get
+		//{"GET", httphandling.RoleMappingAPI, false, "/" + test.UUID1, "", http.StatusOK, fmt.Sprintf(httphandling.RoleMappingGETTmpl, test.UUID1, test.RoleARN1, test.AuthzAttrib1, test.AWSAccountID1)},
+		//{"POST", httphandling.RoleMappingAPI, true, "", fmt.Sprintf(httphandling.RoleMappingPOSTTmpl, test.RoleARN2, test.AuthzAttrib2), http.StatusCreated, fmt.Sprintf(test.CreatedResponseTmpl, "", "")},
+		//// List multiple
+		//{"GET", httphandling.RoleMappingAPI, false, "", "", http.StatusOK, fmt.Sprintf(`{"RoleMappings":[`+httphandling.RoleMappingGETTmpl+`,`+httphandling.RoleMappingGETTmpl+`]}`, test.UUID1, test.RoleARN1, test.AuthzAttrib1, test.AWSAccountID1, test.UUID2, test.RoleARN2, test.AuthzAttrib2, test.AWSAccountID2)},
+		//// Method not allowed
+		//{"POST", httphandling.RoleMappingAPI, true, "/" + test.UUID1, fmt.Sprintf(httphandling.RoleMappingPOSTTmpl, test.RoleARN1, test.AuthzAttrib2), http.StatusMethodNotAllowed, fmt.Sprintf(test.GenericResponseTmpl, "The POST method cannot be performed against this part of the API", http.StatusMethodNotAllowed, appcodes.BadData)},
+		//{"DELETE", httphandling.RoleMappingAPI, true, "/" + test.UUID2, "", http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Role Mapping with ID "+test.UUID2+" deleted.", http.StatusOK, appcodes.Info)},
+		//{"DELETE", httphandling.RoleMappingAPI, true, "/" + test.UUID2, "", http.StatusNotFound, fmt.Sprintf(test.GenericResponseTmpl, "Role Mapping ID not found.", http.StatusNotFound, appcodes.RoleMappingUnknown)},
+		//{"PUT", httphandling.RoleMappingAPI, true, "/" + test.UUID1, fmt.Sprintf(httphandling.RoleMappingPUTTmpl, test.UUID1, test.RoleARN1, test.AuthzAttrib2), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, fmt.Sprintf("Role Mapping %s updated.", test.UUID1), http.StatusOK, appcodes.Info)},
 	}
 
 	for _, test := range tests {
@@ -172,11 +188,101 @@ func TestApp_Run(t *testing.T) {
 				t.Fatalf("error making request to %s got response %+v: %v", url, response, err)
 			}
 		}
-		assert.Equal(t, test.HttpCode, response.StatusCode, fmt.Sprintf("Expected HTTP code: %d got: %d (%s %s)", test.HttpCode, response.StatusCode, test.Method, url))
 		bodyBytes, err := ioutil.ReadAll(response.Body)
 		if err != nil {
 			t.Fatalf("error getting response body from %s: %v", url, err)
 		}
-		assert.Equal(t, test.ResponseString, string(bodyBytes), fmt.Sprintf("Response not as expected (%s %s)", test.Method, url))
+		defer response.Body.Close()
+		respStr := string(bodyBytes)
+		assert.Equal(t, test.HttpCode, response.StatusCode, fmt.Sprintf("Expected HTTP code: %d got: %d (%s %s)", test.HttpCode, response.StatusCode, test.Method, url))
+		assert.Equal(t, test.ResponseString, respStr, fmt.Sprintf("Response not as expected (%s %s)", test.Method, url))
+	}
+}
+
+func TestRoleMapping(t *testing.T) {
+	url := fmt.Sprintf("http://127.0.0.1:8443/%s/%s", httphandling.APIVersion, httphandling.RoleMappingAPI)
+	request1, err := http.NewRequest("POST", url, strings.NewReader(fmt.Sprintf(httphandling.RoleMappingPOSTTmpl, test.RoleARN1, test.AuthzAttrib1)))
+	if err != nil {
+		t.Fatalf("error building request: %v", err)
+	}
+	request1.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte("testuser@TESTING:"+config.MockStaticSecret)))
+	request2, err := http.NewRequest("POST", url, strings.NewReader(fmt.Sprintf(httphandling.RoleMappingPOSTTmpl, test.RoleARN2, test.AuthzAttrib2)))
+	if err != nil {
+		t.Fatalf("error building request: %v", err)
+	}
+	request2.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte("testuser@TESTING:"+config.MockStaticSecret)))
+	rs := []*http.Request{request1, request2}
+	var rm []httphandling.JSONCreatedResponse
+	for _, r := range rs {
+		response, err := http.DefaultClient.Do(r)
+		if err != nil {
+			t.Fatalf("error performing request: %v", err)
+		}
+		bodyBytes, err := ioutil.ReadAll(response.Body)
+		if err != nil {
+			t.Fatalf("error getting response body from %s: %v", url, err)
+		}
+		defer response.Body.Close()
+		var j httphandling.JSONCreatedResponse
+		err = json.Unmarshal(bodyBytes, &j)
+		if err != nil {
+			t.Fatalf("error unmarshalling response: %v")
+		}
+		rm = append(rm, j)
+		assert.Equal(t, http.StatusCreated, j.HTTPCode, "Status code not as expected")
+		assert.Equal(t, appcodes.Info, j.ApplicationCode, "App code not as expected")
+	}
+	uuid1 := rm[0].CreatedEntity
+	uuid2 := rm[1].CreatedEntity
+
+	var tests = []struct {
+		Method         string
+		Endpoint       string
+		AuthRequired   bool
+		Path           string
+		PostPayload    string
+		HttpCode       int
+		ResponseString string
+	}{
+		// Role Mapping
+		// Get
+		{"GET", httphandling.RoleMappingAPI, false, "/" + uuid1, "", http.StatusOK, fmt.Sprintf(httphandling.RoleMappingGETTmpl, uuid1, test.RoleARN1, test.AuthzAttrib1, test.AWSAccountID1)},
+		// List
+		{"GET", httphandling.RoleMappingAPI, false, "", "", http.StatusOK, fmt.Sprintf(`{"RoleMappings":[`+httphandling.RoleMappingGETTmpl+`,`+httphandling.RoleMappingGETTmpl+`]}`, uuid1, test.RoleARN1, test.AuthzAttrib1, test.AWSAccountID1, uuid2, test.RoleARN2, test.AuthzAttrib2, test.AWSAccountID2)},
+		// Method not allowed
+		{"DELETE", httphandling.RoleMappingAPI, true, "/" + uuid2, "", http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Role Mapping with ID "+uuid2+" deleted.", http.StatusOK, appcodes.Info)},
+		{"DELETE", httphandling.RoleMappingAPI, true, "/" + uuid2, "", http.StatusNotFound, fmt.Sprintf(test.GenericResponseTmpl, "Role Mapping ID not found.", http.StatusNotFound, appcodes.RoleMappingUnknown)},
+		{"PUT", httphandling.RoleMappingAPI, true, "/" + uuid1, fmt.Sprintf(httphandling.RoleMappingPUTTmpl, uuid1, test.RoleARN1, test.AuthzAttrib2), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, fmt.Sprintf("Role Mapping %s updated.", uuid1), http.StatusOK, appcodes.Info)},
+	}
+
+	for _, test := range tests {
+		url := fmt.Sprintf("http://127.0.0.1:8443/%s/%s%s", httphandling.APIVersion, test.Endpoint, test.Path)
+		request, err := http.NewRequest(test.Method, url, strings.NewReader(test.PostPayload))
+		if err != nil {
+			t.Fatalf("error building request: %v", err)
+		}
+		response, err := http.DefaultClient.Do(request)
+		if err != nil {
+			t.Fatalf("error making request to %s: %v", url, err)
+		}
+		if test.AuthRequired {
+			// Check it was unauthorized before passing auth creds
+			assert.Equal(t, http.StatusUnauthorized, response.StatusCode, "Expected unauthorized error")
+			// Now authenticated (using testing static auth)
+			request, err = http.NewRequest(test.Method, url, strings.NewReader(test.PostPayload))
+			request.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte("testuser@TESTING:"+config.MockStaticSecret)))
+			response, err = http.DefaultClient.Do(request)
+			if err != nil {
+				t.Fatalf("error making request to %s got response %+v: %v", url, response, err)
+			}
+		}
+		bodyBytes, err := ioutil.ReadAll(response.Body)
+		if err != nil {
+			t.Fatalf("error getting response body from %s: %v", url, err)
+		}
+		defer response.Body.Close()
+		respStr := string(bodyBytes)
+		assert.Equal(t, test.HttpCode, response.StatusCode, fmt.Sprintf("Expected HTTP code: %d got: %d (%s %s)", test.HttpCode, response.StatusCode, test.Method, url))
+		assert.Equal(t, test.ResponseString, respStr, fmt.Sprintf("Response not as expected (%s %s)", test.Method, url))
 	}
 }

@@ -15,9 +15,13 @@ import (
 )
 
 const (
-	FilterAuthz      = "authz"
-	FilterARN        = "arn"
-	FilterAccountIDs = "account"
+	FilterAuthz         = "authz"
+	FilterARN           = "arn"
+	FilterAccountIDs    = "account"
+	RoleMappingAPI      = "rolemapping"
+	RoleMappingPOSTTmpl = "{\"RoleARN\":\"%s\",\"AuthzAttribute\":\"%s\"}"
+	RoleMappingPUTTmpl  = "{\"ID\":\"%s\",\"RoleARN\":\"%s\",\"AuthzAttribute\":\"%s\"}"
+	RoleMappingGETTmpl  = "{\"ID\":\"%s\",\"RoleARN\":\"%s\",\"AuthzAttribute\":\"%s\",\"AccountID\":\"%s\"}"
 )
 
 type roleMapping struct {
@@ -64,7 +68,7 @@ func listRoleMappingFunc(c *config.Config, stmtMap *database.StmtMap) http.Handl
 		stmt := (*stmtMap)[stmtKey]
 		var rows *sql.Rows
 		var err error
-		if stmtKey != database.StmtKeyRoleMappingSelectList {
+		if stmtKey == database.StmtKeyRoleMappingSelectList {
 			rows, err = stmt.Query()
 		} else {
 			rows, err = stmt.Query(strings.Join(filter, ", "))

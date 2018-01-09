@@ -2,7 +2,7 @@ package database
 
 const (
 	StmtKeyRoleMappingSelectList = 70
-	QueryRoleMappingSelectList   = "SELECT id, account_id, role_arn, authz_attrib, policy, duration, session_name_format FROM roleMapping"
+	QueryRoleMappingSelectList   = "SELECT id, account_id, role_arn, authz_attrib, policy, duration, session_name_format FROM roleMapping ORDER BY account_id ASC"
 	StmtKeyRoleMappingSelect     = 71
 	QueryRoleMappingSelect       = "SELECT id, account_id, role_arn, authz_attrib, policy, duration, session_name_format FROM roleMapping WHERE id = ?"
 	StmtKeyRoleMappingByAuthz    = 72

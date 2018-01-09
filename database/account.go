@@ -10,7 +10,8 @@ const (
 		"FROM account " +
 		"JOIN accountType ON account.accountType_id = accountType.id " +
 		"JOIN accountClass ON accountType.class_id = accountClass.id " +
-		"JOIN accountStatus ON account.accountStatus_id = accountStatus.id"
+		"JOIN accountStatus ON account.accountStatus_id = accountStatus.id " +
+		"ORDER BY account.id ASC"
 	StmtKeyAcctSelect = 11
 	QueryAcctSelect   = "SELECT account.id, email, name, " +
 		"accountType_id, accountType.type, " +

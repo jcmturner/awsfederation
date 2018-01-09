@@ -2,7 +2,7 @@ package database
 
 const (
 	StmtKeyAcctTypeSelectList = 40
-	QueryAcctTypeSelectList   = "SELECT id, type, class_id FROM accountType"
+	QueryAcctTypeSelectList   = "SELECT id, type, class_id FROM accountType ORDER BY id ASC"
 	StmtKeyAcctTypeSelect     = 41
 	QueryAcctTypeSelect       = "SELECT id, type, class_id FROM accountType WHERE id = ?"
 	StmtKeyAcctTypeByName     = 42
