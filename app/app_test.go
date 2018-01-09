@@ -226,7 +226,7 @@ func TestRoleMapping(t *testing.T) {
 		var j httphandling.JSONCreatedResponse
 		err = json.Unmarshal(bodyBytes, &j)
 		if err != nil {
-			t.Fatalf("error unmarshalling response: %v")
+			t.Fatalf("error unmarshalling response: %v", err)
 		}
 		rm = append(rm, j)
 		assert.Equal(t, http.StatusCreated, j.HTTPCode, "Status code not as expected")
