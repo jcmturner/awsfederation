@@ -150,21 +150,6 @@ func TestApp_Run(t *testing.T) {
 		{"DELETE", httphandling.AccountAPI, true, "/" + test.AWSAccountID2, "", http.StatusNotFound, fmt.Sprintf(test.GenericResponseTmpl, "Account ID not found.", http.StatusNotFound, appcodes.AccountUnknown)},
 		{"PUT", httphandling.AccountAPI, true, "/" + test.AWSAccountID1, fmt.Sprintf(httphandling.AccountPOSTTmpl, test.AWSAccountID1, test.AccountEmail1, test.AccountName1, test.AccountTypeID2, test.AccountStatusID1, test.FedUserArn1), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, fmt.Sprintf("Account %s updated.", test.AWSAccountID1), http.StatusOK, appcodes.Info)},
 		{"POST", httphandling.AccountAPI, true, "", fmt.Sprintf(httphandling.AccountPOSTTmpl, test.AWSAccountID2, test.AccountEmail2, test.AccountName2, test.AccountTypeID2, test.AccountStatusID2, test.FedUserArn2), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Account "+test.AWSAccountID2+" created.", http.StatusOK, appcodes.Info)},
-
-		// Role Mapping
-		//{"POST", httphandling.RoleMappingAPI, true, "", fmt.Sprintf(httphandling.RoleMappingPOSTTmpl, test.RoleARN1, test.AuthzAttrib1), http.StatusCreated, fmt.Sprintf(test.CreatedResponseTmpl, "", "")},
-		//// List 1 entry
-		//{"GET", httphandling.RoleMappingAPI, false, "", "", http.StatusOK, fmt.Sprintf(`{"RoleMappings":[`+httphandling.RoleMappingGETTmpl+`]}`, test.UUID1, test.RoleARN1, test.AuthzAttrib1, test.AWSAccountID1)},
-		//// Get
-		//{"GET", httphandling.RoleMappingAPI, false, "/" + test.UUID1, "", http.StatusOK, fmt.Sprintf(httphandling.RoleMappingGETTmpl, test.UUID1, test.RoleARN1, test.AuthzAttrib1, test.AWSAccountID1)},
-		//{"POST", httphandling.RoleMappingAPI, true, "", fmt.Sprintf(httphandling.RoleMappingPOSTTmpl, test.RoleARN2, test.AuthzAttrib2), http.StatusCreated, fmt.Sprintf(test.CreatedResponseTmpl, "", "")},
-		//// List multiple
-		//{"GET", httphandling.RoleMappingAPI, false, "", "", http.StatusOK, fmt.Sprintf(`{"RoleMappings":[`+httphandling.RoleMappingGETTmpl+`,`+httphandling.RoleMappingGETTmpl+`]}`, test.UUID1, test.RoleARN1, test.AuthzAttrib1, test.AWSAccountID1, test.UUID2, test.RoleARN2, test.AuthzAttrib2, test.AWSAccountID2)},
-		//// Method not allowed
-		//{"POST", httphandling.RoleMappingAPI, true, "/" + test.UUID1, fmt.Sprintf(httphandling.RoleMappingPOSTTmpl, test.RoleARN1, test.AuthzAttrib2), http.StatusMethodNotAllowed, fmt.Sprintf(test.GenericResponseTmpl, "The POST method cannot be performed against this part of the API", http.StatusMethodNotAllowed, appcodes.BadData)},
-		//{"DELETE", httphandling.RoleMappingAPI, true, "/" + test.UUID2, "", http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, "Role Mapping with ID "+test.UUID2+" deleted.", http.StatusOK, appcodes.Info)},
-		//{"DELETE", httphandling.RoleMappingAPI, true, "/" + test.UUID2, "", http.StatusNotFound, fmt.Sprintf(test.GenericResponseTmpl, "Role Mapping ID not found.", http.StatusNotFound, appcodes.RoleMappingUnknown)},
-		//{"PUT", httphandling.RoleMappingAPI, true, "/" + test.UUID1, fmt.Sprintf(httphandling.RoleMappingPUTTmpl, test.UUID1, test.RoleARN1, test.AuthzAttrib2), http.StatusOK, fmt.Sprintf(test.GenericResponseTmpl, fmt.Sprintf("Role Mapping %s updated.", test.UUID1), http.StatusOK, appcodes.Info)},
 	}
 
 	for _, test := range tests {
