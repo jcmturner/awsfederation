@@ -8,21 +8,19 @@ import (
 	"github.com/jcmturner/awsfederation/appcodes"
 	"github.com/jcmturner/awsfederation/config"
 	goidentity "gopkg.in/jcmturner/goidentity.v1"
-	"gopkg.in/jcmturner/gokrb5.v2/service"
+	"gopkg.in/jcmturner/gokrb5.v4/service"
 	"gopkg.in/ldap.v2"
 	"net/http"
+	"reflect"
 	"strings"
 	"time"
-	"reflect"
 )
 
 const (
 	AuthMechanismNegotiate = "Negotiate"
-	AuthMechanismBasic = "Basic"
-	AuthMechanismBearer = "Bearer"
+	AuthMechanismBasic     = "Basic"
+	AuthMechanismBearer    = "Bearer"
 )
-
-
 
 func AuthnHandler(inner http.Handler, c *config.Config) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -86,7 +84,7 @@ func AuthnHandler(inner http.Handler, c *config.Config) http.Handler {
 	})
 }
 
-func getAuthenticator(r *http.Request, c *config.Config) (authenticator goidentity.Authenticator, err error){
+func getAuthenticator(r *http.Request, c *config.Config) (authenticator goidentity.Authenticator, err error) {
 	mech, value, err := ParseAuthorizationHeader(r)
 	if err != nil {
 		err = errors.New("could not parse authorization header")
@@ -136,14 +134,13 @@ func getAuthenticator(r *http.Request, c *config.Config) (authenticator goidenti
 			return
 		}
 	//case AuthMechanismBearer:
-		// TODO
+	// TODO
 	default:
 		err = fmt.Errorf("%s authentication mechanism attempted by client not supported", mech)
 		return
 	}
 	return
 }
-
 
 type LDAPBasicAuthenticator struct {
 	BasicHeaderValue string
