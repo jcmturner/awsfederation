@@ -232,6 +232,7 @@ func (a StaticAuthenticator) Authenticate() (i goidentity.Identity, ok bool, err
 	u.SetAuthTime(time.Now().UTC())
 	u.SetAuthenticated(true)
 	u.SetDisplayName(a.domain + "@" + a.username)
+	u.SetDomain(a.domain)
 	u.AddAuthzAttribute(a.StaticAttribute)
 	ok = true
 	i = &u
