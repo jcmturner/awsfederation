@@ -77,7 +77,7 @@ func AuthnHandler(inner http.Handler, c *config.Config) http.Handler {
 		// Set the request context
 		ctx := r.Context()
 		ctx = context.WithValue(ctx, goidentity.CTXKey, id)
-		r.WithContext(ctx)
+		r = r.WithContext(ctx)
 
 		// Serve the inner wrapped handler
 		inner.ServeHTTP(w, r)
